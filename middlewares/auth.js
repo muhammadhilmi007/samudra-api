@@ -1,63 +1,80 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const config = require('../config/config');
 
-// Middleware untuk melindungi route yang memerlukan autentikasi
+// Protect routes - middleware to require login
 exports.protect = async (req, res, next) => {
   let token;
-
-  // Cek header authorization
+  
+  // Check for token in Authorization header
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
-    // Ambil token dari header
+    // Get token from header (format: Bearer {token})
     token = req.headers.authorization.split(' ')[1];
-  } else if (req.cookies && req.cookies.token) {
-    // Ambil token dari cookie
-    token = req.cookies.token;
-  }
-
-  // Cek apakah token ada
+  } 
+  // TODO: Allow token from cookie for web app if needed
+  
+  // Check if token exists
   if (!token) {
     return res.status(401).json({
       success: false,
-      message: 'Anda tidak memiliki akses ke resource ini'
+      message: 'Akses tidak diizinkan, silakan login terlebih dahulu'
     });
   }
-
+  
   try {
-    // Verifikasi token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Ambil user dari database
-    req.user = await User.findById(decoded.id);
-
-    // Cek apakah user masih aktif
-    if (!req.user.aktif) {
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || config.jwt.secret);
+    
+    // Get user from the token
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Akun Anda telah dinonaktifkan'
+        message: 'User tidak ditemukan'
       });
     }
-
+    
+    // Check if user is active
+    if (!user.aktif) {
+      return res.status(401).json({
+        success: false,
+        message: 'Akun telah dinonaktifkan, silakan hubungi administrator'
+      });
+    }
+    
+    // Set user in request
+    req.user = user;
     next();
-  } catch (err) {
+  } catch (error) {
     return res.status(401).json({
       success: false,
-      message: 'Anda tidak memiliki akses ke resource ini'
+      message: 'Sesi tidak valid, silakan login kembali',
+      error: error.message
     });
   }
 };
 
-// Middleware untuk membatasi akses berdasarkan role
+// Role authorization middleware
 exports.authorize = (...roles) => {
   return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Akses tidak diizinkan, silakan login terlebih dahulu'
+      });
+    }
+    
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `Peran ${req.user.role} tidak memiliki hak akses ke resource ini`
+        message: `Peran ${req.user.role} tidak memiliki akses ke endpoint ini`
       });
     }
+    
     next();
   };
 };

@@ -47,13 +47,13 @@ router.post(
 router.get(
   '/stt/truck-assignment',
   authorize('checker', 'kepala_gudang'),
-  sttController.getSTTsForTruckAssignment
+  sttController.getSTTsForTruckAssignment  // This function is undefined
 );
 
 router.post(
   '/stt/truck-assignment',
   authorize('checker', 'kepala_gudang'),
-  sttController.assignSTTToTruck
+  sttController.assignSTTToTruck  // This might also be undefined
 );
 
 // Delivery routes (for drivers and checkers)

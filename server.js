@@ -1,83 +1,94 @@
 const express = require('express');
-const dotenv = require('dotenv');
-const morgan = require('morgan');
+const mongoose = require('mongoose');
 const cors = require('cors');
-const helmet = require('helmet');
+const morgan = require('morgan');
 const path = require('path');
-const connectDB = require('./config/db');
+const dotenv = require('dotenv');
 
-// Load env vars
+// Load environment variables
 dotenv.config();
 
-// Connect to database
+// Import route files
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const divisionRoutes = require('./routes/divisionRoutes');
+const branchRoutes = require('./routes/branchRoutes');
+const customerRoutes = require('./routes/customerRoutes');
+const pickupRequestRoutes = require('./routes/pickupRequestRoutes');
+const pickupRoutes = require('./routes/pickupRoutes');
+const sttRoutes = require('./routes/sttRoutes');
+const vehicleRoutes = require('./routes/vehicleRoutes');
+const loadingRoutes = require('./routes/loadingRoutes');
+const deliveryRoutes = require('./routes/deliveryRoutes');
+const returnRoutes = require('./routes/returnRoutes');
+const collectionRoutes = require('./routes/collectionRoutes');
+const financeRoutes = require('./routes/financeRoutes');
+const assetRoutes = require('./routes/assetRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const mobileRoutes = require('./routes/mobileRoutes');
+
+// Import middlewares and utilities
+const errorHandler = require('./middlewares/errorHandler');
+const { connectDB } = require('./config/db');
+
+// Initialize Express app
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Connect to MongoDB
 connectDB();
 
-// Initialize express
-const app = express();
-
-// Body parser
+// Middlewares
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Set security headers
-app.use(helmet());
-
-// Enable CORS
-app.use(cors());
-
-// Dev logging middleware
+// Logger middleware for development
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Set static folder
+// Set static folder for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Define routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/divisions', require('./routes/divisionRoutes'));
-app.use('/api/branches', require('./routes/branchRoutes'));
-app.use('/api/customers', require('./routes/customerRoutes'));
-app.use('/api/vehicles', require('./routes/vehicleRoutes'));
-app.use('/api/pickup-requests', require('./routes/pickupRequestRoutes'));
-app.use('/api/pickups', require('./routes/pickupRoutes'));
-app.use('/api/stt', require('./routes/sttRoutes'));
-app.use('/api/truck-queues', require('./routes/truckQueueRoutes'));
-app.use('/api/loadings', require('./routes/loadingRoutes'));
-app.use('/api/vehicle-queues', require('./routes/vehicleQueueRoutes'));
-app.use('/api/deliveries', require('./routes/deliveryRoutes'));
-app.use('/api/returns', require('./routes/returnRoutes'));
-app.use('/api/collections', require('./routes/collectionRoutes'));
-app.use('/api/accounts', require('./routes/accountRoutes'));
-app.use('/api/journals', require('./routes/journalRoutes'));
-app.use('/api/cash', require('./routes/cashRoutes'));
-app.use('/api/bank-statements', require('./routes/bankStatementRoutes'));
-app.use('/api/assets', require('./routes/assetRoutes'));
-app.use('/api/pending-packages', require('./routes/pendingPackageRoutes'));
-app.use('/api/reports', require('./routes/reportRoutes'));
-app.use('/api/mobile', require('./routes/mobileRoutes'));
+// Mount routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/divisions', divisionRoutes);
+app.use('/api/branches', branchRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/pickup-requests', pickupRequestRoutes);
+app.use('/api/pickups', pickupRoutes);
+app.use('/api/stt', sttRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/loadings', loadingRoutes);
+app.use('/api/deliveries', deliveryRoutes);
+app.use('/api/returns', returnRoutes);
+app.use('/api/collections', collectionRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/assets', assetRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/mobile', mobileRoutes);
 
-// Error handler middleware
-app.use(require('./middlewares/errorHandler'));
-
-// Handle 404 routes
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
+// Base route for API
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'Welcome to Samudra ERP API',
+    version: '1.0.0'
   });
 });
 
-const PORT = process.env.PORT || 5000;
+// Error handling middleware
+app.use(errorHandler);
 
+// Start server
 const server = app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
-  console.log(`Error: ${err.message}`);
+  console.log(`Error: ${err.message}`.red);
   // Close server & exit process
   server.close(() => process.exit(1));
 });

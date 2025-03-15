@@ -6,7 +6,7 @@ module.exports = {
   PORT: process.env.PORT || 5000,
   HOST: process.env.HOST || 'localhost',
   MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/samudra-erp',
-  JWT_SECRET: process.env.JWT_SECRET || 'samudra_secret_key_dev',
+  JWT_SECRET: process.env.JWT_SECRET || 'RahasiaNegara123',
   JWT_EXPIRE: process.env.JWT_EXPIRE || '24h',
   JWT_COOKIE_EXPIRE: process.env.JWT_COOKIE_EXPIRE || 24,
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,

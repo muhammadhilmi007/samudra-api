@@ -352,6 +352,76 @@ exports.updateSTTStatus = async (req, res) => {
   }
 };
 
+// Add these methods to your sttController.js file
+
+/**
+ * @desc    Get STTs available for truck assignment
+ * @route   GET /api/mobile/stt/truck-assignment
+ * @access  Private (checker, kepala_gudang)
+ */
+exports.getSTTsForTruckAssignment = async (req, res, next) => {
+  try {
+    // Implement your logic here to fetch STTs that need to be assigned to trucks
+    // For example:
+    const stts = await STT.find({ status: 'ready_for_assignment' })
+      .populate('customer', 'name')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      count: stts.length,
+      data: stts
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Assign STT to a truck
+ * @route   POST /api/mobile/stt/truck-assignment
+ * @access  Private (checker, kepala_gudang)
+ */
+exports.assignSTTToTruck = async (req, res, next) => {
+  try {
+    const { sttId, truckId } = req.body;
+    
+    // Validate input
+    if (!sttId || !truckId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide both STT ID and truck ID'
+      });
+    }
+    
+    // Implement your logic to assign the STT to the truck
+    // For example:
+    const stt = await STT.findByIdAndUpdate(
+      sttId,
+      { 
+        vehicle: truckId,
+        status: 'assigned_to_truck',
+        assignedAt: Date.now()
+      },
+      { new: true }
+    );
+    
+    if (!stt) {
+      return res.status(404).json({
+        success: false,
+        error: 'STT not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: stt
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc      Generate PDF STT
 // @route     GET /api/stt/generate-pdf/:id
 // @access    Private
