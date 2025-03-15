@@ -1,0 +1,12 @@
+node_modules
+.env
+.DS_Store
+logs
+*.log
+npm-debug.log*
+coverage
+.idea
+.vscode
+uploads/*
+!uploads/.gitkeep" > .gitignore
+node_modules
