@@ -1,3 +1,4 @@
+// models/Customer.js
 const mongoose = require('mongoose');
 
 const CustomerSchema = new mongoose.Schema({
@@ -8,8 +9,13 @@ const CustomerSchema = new mongoose.Schema({
   },
   tipe: {
     type: String,
-    enum: ['pengirim', 'penerima', 'keduanya'],
-    required: [true, 'Tipe pelanggan harus diisi']
+    enum: {
+      values: ['pengirim', 'penerima', 'keduanya'],
+      message: '{VALUE} bukan tipe pelanggan yang valid (pengirim/penerima/keduanya)'
+    },
+    required: [true, 'Tipe pelanggan harus diisi'],
+    lowercase: true, // Ensure consistency for types
+    set: v => v.toLowerCase() // Additional safety for case normalization
   },
   alamat: {
     type: String,
@@ -65,9 +71,25 @@ const CustomerSchema = new mongoose.Schema({
   }
 });
 
-// Update updatedAt pada update
+// Create index for efficient querying
+CustomerSchema.index({ nama: 1 });
+CustomerSchema.index({ telepon: 1 });
+CustomerSchema.index({ cabangId: 1 });
+CustomerSchema.index({ tipe: 1 });
+CustomerSchema.index({ createdAt: -1 });
+
+// Update updatedAt on update
 CustomerSchema.pre('findOneAndUpdate', function() {
   this.set({ updatedAt: Date.now() });
 });
+
+// Virtual for full address
+CustomerSchema.virtual('alamatLengkap').get(function() {
+  return `${this.alamat}, ${this.kelurahan}, ${this.kecamatan}, ${this.kota}, ${this.provinsi}`;
+});
+
+// Ensure virtuals are included when converting to JSON
+CustomerSchema.set('toJSON', { virtuals: true });
+CustomerSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Customer', CustomerSchema);

@@ -323,3 +323,264 @@ exports.validate = (schema, data) => {
     return { valid: false, errors: formattedErrors };
   }
 };
+
+// utils/validators.js (add to existing file)
+
+// Traditional validator for customer creation and update
+const customerValidationRules = {
+  nama: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Nama pelanggan tidak boleh kosong'
+    },
+    trim: true,
+    escape: true
+  },
+  tipe: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Tipe pelanggan tidak boleh kosong'
+    },
+    isIn: {
+      options: [['pengirim', 'penerima', 'keduanya', 'Pengirim', 'Penerima', 'Keduanya']],
+      errorMessage: 'Tipe pelanggan harus berupa pengirim, penerima, atau keduanya'
+    },
+    customSanitizer: {
+      options: (value) => {
+        return value.toLowerCase();
+      }
+    }
+  },
+  alamat: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Alamat tidak boleh kosong'
+    },
+    trim: true
+  },
+  kelurahan: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Kelurahan tidak boleh kosong'
+    },
+    trim: true
+  },
+  kecamatan: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Kecamatan tidak boleh kosong'
+    },
+    trim: true
+  },
+  kota: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Kota tidak boleh kosong'
+    },
+    trim: true
+  },
+  provinsi: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Provinsi tidak boleh kosong'
+    },
+    trim: true
+  },
+  telepon: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Telepon tidak boleh kosong'
+    },
+    trim: true
+  },
+  email: {
+    in: ['body'],
+    optional: { options: { nullable: true, checkFalsy: true } },
+    isEmail: {
+      errorMessage: 'Email tidak valid'
+    },
+    normalizeEmail: true
+  },
+  perusahaan: {
+    in: ['body'],
+    optional: { options: { nullable: true, checkFalsy: true } },
+    trim: true
+  },
+  cabangId: {
+    in: ['body'],
+    optional: { options: { nullable: false } },
+    isMongoId: {
+      errorMessage: 'Format cabangId tidak valid'
+    }
+  }
+};
+
+// utils/validators.js (add to existing file)
+
+// Validator for STT creation and update
+const sttSchema = {
+  cabangAsalId: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Cabang asal tidak boleh kosong'
+    },
+    isMongoId: {
+      errorMessage: 'Format cabang asal tidak valid'
+    }
+  },
+  cabangTujuanId: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Cabang tujuan tidak boleh kosong'
+    },
+    isMongoId: {
+      errorMessage: 'Format cabang tujuan tidak valid'
+    }
+  },
+  pengirimId: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Pengirim tidak boleh kosong'
+    },
+    isMongoId: {
+      errorMessage: 'Format pengirim tidak valid'
+    }
+  },
+  penerimaId: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Penerima tidak boleh kosong'
+    },
+    isMongoId: {
+      errorMessage: 'Format penerima tidak valid'
+    }
+  },
+  namaBarang: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Nama barang tidak boleh kosong'
+    },
+    trim: true
+  },
+  komoditi: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Komoditi tidak boleh kosong'
+    },
+    trim: true
+  },
+  packing: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Packing tidak boleh kosong'
+    },
+    trim: true
+  },
+  jumlahColly: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Jumlah colly tidak boleh kosong'
+    },
+    isInt: {
+      options: { min: 1 },
+      errorMessage: 'Jumlah colly minimal 1'
+    },
+    toInt: true
+  },
+  berat: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Berat tidak boleh kosong'
+    },
+    isFloat: {
+      options: { min: 0.1 },
+      errorMessage: 'Berat minimal 0.1 kg'
+    },
+    toFloat: true
+  },
+  hargaPerKilo: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Harga per kilo tidak boleh kosong'
+    },
+    isFloat: {
+      options: { min: 0 },
+      errorMessage: 'Harga per kilo minimal 0'
+    },
+    toFloat: true
+  },
+  harga: {
+    in: ['body'],
+    optional: { options: { nullable: true } },
+    isFloat: {
+      options: { min: 0 },
+      errorMessage: 'Harga minimal 0'
+    },
+    toFloat: true
+  },
+  keterangan: {
+    in: ['body'],
+    optional: { options: { nullable: true } },
+    trim: true
+  },
+  kodePenerus: {
+    in: ['body'],
+    optional: { options: { nullable: false, checkFalsy: true } },
+    isIn: {
+      options: [['70', '71', '72', '73']],
+      errorMessage: 'Kode penerus tidak valid'
+    },
+    default: '70'
+  },
+  penerusId: {
+    in: ['body'],
+    optional: { options: { nullable: true } },
+    isMongoId: {
+      errorMessage: 'Format penerus tidak valid'
+    }
+  },
+  paymentType: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Tipe pembayaran tidak boleh kosong'
+    },
+    isIn: {
+      options: [['CASH', 'COD', 'CAD']],
+      errorMessage: 'Tipe pembayaran tidak valid (CASH/COD/CAD)'
+    }
+  }
+};
+
+// Validator for STT status update
+const statusUpdateSchema = {
+  status: {
+    in: ['body'],
+    notEmpty: {
+      errorMessage: 'Status tidak boleh kosong'
+    },
+    isIn: {
+      options: [['PENDING', 'MUAT', 'TRANSIT', 'LANSIR', 'TERKIRIM', 'RETURN']],
+      errorMessage: 'Status tidak valid'
+    }
+  },
+  keterangan: {
+    in: ['body'],
+    optional: { options: { nullable: true } },
+    trim: true
+  },
+  location: {
+    in: ['body'],
+    optional: { options: { nullable: true } },
+    trim: true
+  }
+};
+
+
+
+// Export validators
+module.exports = {
+  sttSchema,
+  statusUpdateSchema,
+  customerSchema: exports.customerSchema,  // Export the Zod schema
+  customerValidationRules  // Export the traditional validation rules
+};

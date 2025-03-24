@@ -11,6 +11,8 @@ const {
   getSTTsByStatus
 } = require('../controllers/sttController');
 const { protect, authorize } = require('../middlewares/auth');
+const { validateBody, validateObjectId } = require('../middlewares/validator');
+const { sttSchema, statusUpdateSchema } = require('../utils/validators');
 
 const router = express.Router();
 
@@ -23,24 +25,38 @@ router.use(protect);
 router
   .route('/')
   .get(getSTTs)
-  .post(authorize('staff_penjualan', 'kepala_cabang', 'staff_admin'), createSTT);
+  .post(
+    authorize('staff_penjualan', 'kepala_cabang', 'staff_admin'),
+    validateBody(sttSchema),
+    createSTT
+  );
 
 router
   .route('/:id')
-  .get(getSTT)
-  .put(authorize('staff_penjualan', 'kepala_cabang', 'staff_admin'), updateSTT);
+  .get(validateObjectId('id'), getSTT)
+  .put(
+    validateObjectId('id'),
+    authorize('staff_penjualan', 'kepala_cabang', 'staff_admin'),
+    validateBody(sttSchema),
+    updateSTT
+  );
 
 router
   .route('/:id/status')
-  .put(authorize('staff_penjualan', 'kepala_cabang', 'staff_admin', 'checker'), updateSTTStatus);
+  .put(
+    validateObjectId('id'),
+    authorize('staff_penjualan', 'kepala_cabang', 'staff_admin', 'checker'),
+    validateBody(statusUpdateSchema),
+    updateSTTStatus
+  );
 
 router
   .route('/generate-pdf/:id')
-  .get(generatePDF);
+  .get(validateObjectId('id'), generatePDF);
 
 router
   .route('/by-branch/:branchId')
-  .get(getSTTsByBranch);
+  .get(validateObjectId('branchId'), getSTTsByBranch);
 
 router
   .route('/by-status/:status')

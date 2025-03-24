@@ -9,9 +9,8 @@ const {
   getBranchStats
 } = require('../controllers/branchController');
 const { protect, authorize } = require('../middlewares/auth');
-
-// Untuk validasi ObjectId
-const { validateObjectId } = require('../middlewares/validator');
+const { validateObjectId, validateBody } = require('../middlewares/validator');
+const { branchSchema } = require('../utils/validators');
 
 const router = express.Router();
 
@@ -22,27 +21,29 @@ router
   .route('/')
   .get(getBranches)
   .post(
-    authorize('direktur', 'manajer_admin'), 
+    authorize('direktur', 'manajer_admin'),
+    validateBody(branchSchema),
     createBranch
   );
 
 router
   .route('/:id')
-  .get(validateObjectId(), getBranch)
+  .get(validateObjectId('id'), getBranch)
   .put(
     authorize('direktur', 'manajer_admin'),
-    validateObjectId(),
+    validateObjectId('id'),
+    validateBody(branchSchema),
     updateBranch
   )
   .delete(
     authorize('direktur', 'manajer_admin'),
-    validateObjectId(),
+    validateObjectId('id'),
     deleteBranch
   );
 
 router
   .route('/:id/stats')
-  .get(validateObjectId(), getBranchStats);
+  .get(validateObjectId('id'), getBranchStats);
 
 router
   .route('/by-division/:divisionId')

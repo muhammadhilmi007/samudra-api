@@ -1,3 +1,4 @@
+// routes/customerRoutes.js
 const express = require('express');
 const {
   getCustomers,
@@ -7,7 +8,10 @@ const {
   deleteCustomer,
   getSenders,
   getRecipients,
-  getCustomersByBranch
+  getCustomersByBranch,
+  getCustomerSTTs,
+  getCustomerCollections,
+  getCustomerPickups
 } = require('../controllers/customerController');
 const { protect, authorize } = require('../middlewares/auth');
 const { validateBody, validateObjectId } = require('../middlewares/validator');
@@ -23,6 +27,11 @@ router.get('/senders', getSenders);
 router.get('/recipients', getRecipients);
 router.get('/by-branch/:branchId', validateObjectId('branchId'), getCustomersByBranch);
 
+// Customer related data routes
+router.get('/:customerId/stts', validateObjectId('customerId'), getCustomerSTTs);
+router.get('/:customerId/collections', validateObjectId('customerId'), getCustomerCollections);
+router.get('/:customerId/pickups', validateObjectId('customerId'), getCustomerPickups);
+
 // CRUD routes
 router
   .route('/')
@@ -31,8 +40,8 @@ router
 
 router
   .route('/:id')
-  .get(validateObjectId(), getCustomer)
-  .put(validateObjectId(), validateBody(customerSchema), updateCustomer)
-  .delete(validateObjectId(), authorize('direktur', 'manajer_admin', 'kepala_cabang'), deleteCustomer);
+  .get(validateObjectId('id'), getCustomer)
+  .put(validateObjectId('id'), validateBody(customerSchema), updateCustomer)
+  .delete(validateObjectId('id'), authorize('direktur', 'manajer_admin', 'kepala_cabang'), deleteCustomer);
 
 module.exports = router;
