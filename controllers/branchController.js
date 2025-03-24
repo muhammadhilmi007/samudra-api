@@ -47,8 +47,6 @@ exports.getBranch = asyncHandler(async (req, res) => {
 // @route     POST /api/branches
 // @access    Private
 exports.createBranch = asyncHandler(async (req, res) => {
-  console.log('Create branch request body:', req.body);
-  
   // Cek apakah divisi ada
   const division = await Division.findById(req.body.divisiId);
   
@@ -75,10 +73,11 @@ exports.createBranch = asyncHandler(async (req, res) => {
   let branchData = { ...req.body };
   
   // Pastikan kontakPenanggungJawab sesuai format
-  if (req.body['kontakPenanggungJawab.nama'] || 
-      req.body['kontakPenanggungJawab.telepon'] || 
-      req.body['kontakPenanggungJawab.email']) {
+  if (req.body['kontakPenanggungJawab.nama'] !== undefined || 
+      req.body['kontakPenanggungJawab.telepon'] !== undefined || 
+      req.body['kontakPenanggungJawab.email'] !== undefined) {
     
+    // Format dot notation ke bentuk nested object
     branchData.kontakPenanggungJawab = {
       nama: req.body['kontakPenanggungJawab.nama'] || '',
       telepon: req.body['kontakPenanggungJawab.telepon'] || '',
@@ -89,9 +88,18 @@ exports.createBranch = asyncHandler(async (req, res) => {
     delete branchData['kontakPenanggungJawab.nama'];
     delete branchData['kontakPenanggungJawab.telepon'];
     delete branchData['kontakPenanggungJawab.email'];
+  } 
+  // Jika kontakPenanggungJawab tidak ada atau kosong, gunakan format default
+  else if (!branchData.kontakPenanggungJawab) {
+    branchData.kontakPenanggungJawab = {
+      nama: '',
+      telepon: '',
+      email: ''
+    };
   }
   
-  console.log('Formatted branch data for creation:', branchData);
+  // Log data yang akan disimpan untuk debugging
+  console.log('Creating branch with data:', JSON.stringify(branchData, null, 2));
   
   try {
     const branch = await Branch.create(branchData);
@@ -124,8 +132,6 @@ exports.createBranch = asyncHandler(async (req, res) => {
 // @route     PUT /api/branches/:id
 // @access    Private
 exports.updateBranch = asyncHandler(async (req, res) => {
-  console.log('Update branch request body:', req.body);
-  
   // Cek apakah divisi ada jika divisiId diupdate
   if (req.body.divisiId) {
     const division = await Division.findById(req.body.divisiId);
@@ -171,27 +177,27 @@ exports.updateBranch = asyncHandler(async (req, res) => {
       });
     }
     
+    // Update objek kontakPenanggungJawab dengan data baru atau pertahankan data lama
     updateData.kontakPenanggungJawab = {
       nama: req.body['kontakPenanggungJawab.nama'] !== undefined 
         ? req.body['kontakPenanggungJawab.nama'] 
         : currentBranch.kontakPenanggungJawab?.nama || '',
-      
       telepon: req.body['kontakPenanggungJawab.telepon'] !== undefined 
         ? req.body['kontakPenanggungJawab.telepon'] 
         : currentBranch.kontakPenanggungJawab?.telepon || '',
-      
       email: req.body['kontakPenanggungJawab.email'] !== undefined 
         ? req.body['kontakPenanggungJawab.email'] 
         : currentBranch.kontakPenanggungJawab?.email || ''
     };
     
-    // Hapus properti yang tidak diperlukan
+    // Hapus properti dot notation
     delete updateData['kontakPenanggungJawab.nama'];
     delete updateData['kontakPenanggungJawab.telepon'];
     delete updateData['kontakPenanggungJawab.email'];
   }
   
-  console.log('Formatted branch data for update:', updateData);
+  // Log data update untuk debugging
+  console.log('Updating branch with data:', JSON.stringify(updateData, null, 2));
   
   try {
     const branch = await Branch.findByIdAndUpdate(
