@@ -1,73 +1,112 @@
-const { validate } = require('../utils/validators');
-
 /**
- * Middleware to validate request body using Zod schema
- * @param {Object} schema - Zod schema to validate against
- * @returns {Function} Express middleware
+ * Middleware untuk validasi request menggunakan Zod
  */
-exports.validateBody = (schema) => {
+
+const validateBody = (schema) => {
   return (req, res, next) => {
-    const { valid, errors } = validate(schema, req.body);
-    
-    if (!valid) {
-      return res.status(400).json({
+    try {
+      // Format data untuk menangani kontakPenanggungJawab
+      const data = { ...req.body };
+      
+      // Validasi dengan schema yang diberikan
+      const { success, error, data: validatedData } = schema.safeParse(data);
+      
+      if (!success) {
+        // Format error menjadi object untuk memudahkan penanganan di frontend
+        const formattedErrors = {};
+        error.errors.forEach((err) => {
+          formattedErrors[err.path.join('.')] = err.message;
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: 'Validasi gagal',
+          errors: formattedErrors
+        });
+      }
+      
+      // Jika success, ubah req.body dengan data yang sudah divalidasi
+      req.body = validatedData;
+      next();
+    } catch (error) {
+      console.error('Validation error:', error);
+      res.status(400).json({
         success: false,
         message: 'Validasi gagal',
-        errors
+        error: error.message
       });
     }
-    
-    next();
   };
 };
 
 /**
- * Middleware to validate request query using Zod schema
- * @param {Object} schema - Zod schema to validate against
- * @returns {Function} Express middleware
+ * Middleware untuk validasi query parameters
  */
-exports.validateQuery = (schema) => {
+const validateQuery = (schema) => {
   return (req, res, next) => {
-    const { valid, errors } = validate(schema, req.query);
-    
-    if (!valid) {
-      return res.status(400).json({
+    try {
+      const { success, error } = schema.safeParse(req.query);
+      
+      if (!success) {
+        const formattedErrors = {};
+        error.errors.forEach((err) => {
+          formattedErrors[err.path.join('.')] = err.message;
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: 'Validasi query gagal',
+          errors: formattedErrors
+        });
+      }
+      
+      next();
+    } catch (error) {
+      res.status(400).json({
         success: false,
         message: 'Validasi query gagal',
-        errors
+        error: error.message
       });
     }
-    
-    next();
   };
 };
 
 /**
- * Middleware to validate request params using Zod schema
- * @param {Object} schema - Zod schema to validate against
- * @returns {Function} Express middleware
+ * Middleware untuk validasi URL params
  */
-exports.validateParams = (schema) => {
+const validateParams = (schema) => {
   return (req, res, next) => {
-    const { valid, errors } = validate(schema, req.params);
-    
-    if (!valid) {
-      return res.status(400).json({
+    try {
+      const { success, error } = schema.safeParse(req.params);
+      
+      if (!success) {
+        const formattedErrors = {};
+        error.errors.forEach((err) => {
+          formattedErrors[err.path.join('.')] = err.message;
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: 'Validasi parameter gagal',
+          errors: formattedErrors
+        });
+      }
+      
+      next();
+    } catch (error) {
+      res.status(400).json({
         success: false,
         message: 'Validasi parameter gagal',
-        errors
+        error: error.message
       });
     }
-    
-    next();
   };
 };
 
 /**
- * Middleware to validate ObjectId format
- * @returns {Function} Express middleware
+ * Middleware untuk validasi ObjectId MongoDB
  */
-exports.validateObjectId = (paramName = 'id') => {
+const validateObjectId = (paramName = 'id') => {
   return (req, res, next) => {
     const id = req.params[paramName];
     
@@ -80,4 +119,11 @@ exports.validateObjectId = (paramName = 'id') => {
     
     next();
   };
+};
+
+module.exports = {
+  validateBody,
+  validateQuery,
+  validateParams,
+  validateObjectId
 };

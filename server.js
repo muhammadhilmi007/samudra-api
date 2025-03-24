@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const dotenv = require('dotenv');
+const colors = require('colors');
 
 // Load environment variables
 dotenv.config();
@@ -51,6 +52,13 @@ if (process.env.NODE_ENV === 'development') {
 // Set static folder for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Create uploads directory if it doesn't exist
+const fs = require('fs');
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -74,8 +82,17 @@ app.use('/api/mobile', mobileRoutes);
 app.get('/api', (req, res) => {
   res.json({
     message: 'Welcome to Samudra ERP API',
-    version: '1.0.0'
+    version: '1.0.0',
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
   });
+});
+
+// Handle 404 errors
+app.use((req, res, next) => {
+  const error = new Error(`Route tidak ditemukan - ${req.originalUrl}`);
+  error.statusCode = 404;
+  next(error);
 });
 
 // Error handling middleware
@@ -88,6 +105,13 @@ const server = app.listen(PORT, () => {
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
+  console.log(`Error: ${err.message}`.red);
+  // Close server & exit process
+  server.close(() => process.exit(1));
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
   console.log(`Error: ${err.message}`.red);
   // Close server & exit process
   server.close(() => process.exit(1));
