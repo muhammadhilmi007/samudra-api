@@ -1,3 +1,4 @@
+// models/Role.js
 const mongoose = require('mongoose');
 
 const RoleSchema = new mongoose.Schema({
@@ -7,32 +8,10 @@ const RoleSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
-  kodeRole: {
-    type: String,
-    required: [true, 'Kode role harus diisi'],
-    unique: true,
-    enum: [
-      'direktur',
-      'manajer_admin',
-      'manajer_keuangan',
-      'manajer_pemasaran',
-      'manajer_operasional',
-      'manajer_sdm',
-      'manajer_distribusi',
-      'kepala_cabang',
-      'kepala_gudang',
-      'staff_admin',
-      'staff_penjualan',
-      'kasir',
-      'debt_collector',
-      'checker',
-      'supir',
-      'pelanggan'
-    ]
-  },
   permissions: {
     type: [String],
-    required: true
+    required: true,
+    default: []
   },
   createdAt: {
     type: Date,
@@ -44,7 +23,7 @@ const RoleSchema = new mongoose.Schema({
   }
 });
 
-// Update updatedAt pada update
+// Update updatedAt on update
 RoleSchema.pre('findOneAndUpdate', function() {
   this.set({ updatedAt: Date.now() });
 });

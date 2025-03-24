@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -12,36 +13,18 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Jabatan harus diisi']
   },
-  role: {
-    type: String,
-    enum: [
-      'direktur',
-      'manajer_admin',
-      'manajer_keuangan',
-      'manajer_pemasaran',
-      'manajer_operasional',
-      'manajer_sdm',
-      'manajer_distribusi',
-      'kepala_cabang',
-      'kepala_gudang',
-      'staff_admin',
-      'staff_penjualan',
-      'kasir',
-      'debt_collector',
-      'checker',
-      'supir',
-      'pelanggan'
-    ],
+  roleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
     required: [true, 'Role harus diisi']
   },
   email: {
     type: String,
-    required: [true, 'Email harus diisi'],
-    unique: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
       'Email tidak valid'
-    ]
+    ],
+    sparse: true
   },
   telepon: {
     type: String,
@@ -89,11 +72,29 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Enkripsi password menggunakan bcrypt
+// Virtual populates
+UserSchema.virtual('cabang', {
+  ref: 'Branch',
+  localField: 'cabangId',
+  foreignField: '_id',
+  justOne: true
+});
+
+UserSchema.virtual('role', {
+  ref: 'Role',
+  localField: 'roleId',
+  foreignField: '_id',
+  justOne: true
+});
+
+// Encrypt password using bcrypt
 UserSchema.pre('save', async function(next) {
-  // Hanya hash password jika field dimodifikasi
+  // Only hash password if it was modified
   if (!this.isModified('password')) {
     next();
   }
@@ -105,19 +106,19 @@ UserSchema.pre('save', async function(next) {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Update updatedAt pada update
+// Update updatedAt on update
 UserSchema.pre('findOneAndUpdate', function() {
   this.set({ updatedAt: Date.now() });
 });
 
-// Sign JWT dan return
+// Sign JWT and return
 UserSchema.methods.getSignedJwtToken = function() {
-  return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE
+  return jwt.sign({ id: this._id }, process.env.JWT_SECRET || 'samplesecret123', {
+    expiresIn: process.env.JWT_EXPIRE || '30d'
   });
 };
 
-// Match user entered password to hashed password in database
+// Match password
 UserSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
