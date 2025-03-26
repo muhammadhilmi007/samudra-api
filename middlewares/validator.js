@@ -1,20 +1,33 @@
+const { z } = require('zod');
+
 /**
- * Middleware untuk validasi request menggunakan Zod
+ * Middleware for validating request using Zod
  */
 
-const validateBody = (schema) => {
+// Default schema that always succeeds (fallback)
+const defaultSchema = z.any();
+
+const validateBody = (schema = defaultSchema) => {
   return (req, res, next) => {
+
+    // Debug information
+    console.log(`[DEBUG] Validation route: ${req.method} ${req.originalUrl}`);
+    console.log(`[DEBUG] Schema defined: ${!!schema}`);
+
     try {
-      // Format data untuk menangani kontakPenanggungJawab
+      // Use the provided schema or default to the fallback schema
+      const validationSchema = schema || defaultSchema;
+      
+      // Format data for handling nested fields
       const data = { ...req.body };
       
-      // Validasi dengan schema yang diberikan
-      const { success, error, data: validatedData } = schema.safeParse(data);
+      // Validate with schema
+      const result = validationSchema.safeParse(data);
       
-      if (!success) {
-        // Format error menjadi object untuk memudahkan penanganan di frontend
+      if (!result.success) {
+        // Format error messages for easier handling
         const formattedErrors = {};
-        error.errors.forEach((err) => {
+        result.error.errors.forEach((err) => {
           formattedErrors[err.path.join('.')] = err.message;
         });
         
@@ -25,8 +38,8 @@ const validateBody = (schema) => {
         });
       }
       
-      // Jika success, ubah req.body dengan data yang sudah divalidasi
-      req.body = validatedData;
+      // If success, update req.body with validated data
+      req.body = result.data;
       next();
     } catch (error) {
       console.error('Validation error:', error);
@@ -40,16 +53,25 @@ const validateBody = (schema) => {
 };
 
 /**
- * Middleware untuk validasi query parameters
+ * Middleware for validating query parameters
  */
 const validateQuery = (schema) => {
   return (req, res, next) => {
     try {
-      const { success, error } = schema.safeParse(req.query);
+      // Check if schema is defined
+      if (!schema) {
+        console.error('Validation schema is undefined');
+        return res.status(500).json({
+          success: false,
+          message: 'Internal server error: Validation schema not defined'
+        });
+      }
+
+      const result = schema.safeParse(req.query);
       
-      if (!success) {
+      if (!result.success) {
         const formattedErrors = {};
-        error.errors.forEach((err) => {
+        result.error.errors.forEach((err) => {
           formattedErrors[err.path.join('.')] = err.message;
         });
         
@@ -72,16 +94,25 @@ const validateQuery = (schema) => {
 };
 
 /**
- * Middleware untuk validasi URL params
+ * Middleware for validating URL params
  */
 const validateParams = (schema) => {
   return (req, res, next) => {
     try {
-      const { success, error } = schema.safeParse(req.params);
+      // Check if schema is defined
+      if (!schema) {
+        console.error('Validation schema is undefined');
+        return res.status(500).json({
+          success: false,
+          message: 'Internal server error: Validation schema not defined'
+        });
+      }
+
+      const result = schema.safeParse(req.params);
       
-      if (!success) {
+      if (!result.success) {
         const formattedErrors = {};
-        error.errors.forEach((err) => {
+        result.error.errors.forEach((err) => {
           formattedErrors[err.path.join('.')] = err.message;
         });
         
@@ -104,13 +135,13 @@ const validateParams = (schema) => {
 };
 
 /**
- * Middleware untuk validasi ObjectId MongoDB
+ * Middleware for validating ObjectId MongoDB
  */
 const validateObjectId = (paramName = 'id') => {
   return (req, res, next) => {
     const id = req.params[paramName];
     
-    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
         success: false,
         message: `ID '${id}' tidak valid`

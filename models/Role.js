@@ -8,6 +8,12 @@ const RoleSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  kodeRole: {
+    type: String,
+    required: [true, 'Kode role harus diisi'],
+    unique: true,
+    trim: true
+  },
   permissions: {
     type: [String],
     required: true,

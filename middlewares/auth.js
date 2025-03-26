@@ -14,7 +14,10 @@ exports.protect = async (req, res, next) => {
     // Get token from header (format: Bearer {token})
     token = req.headers.authorization.split(' ')[1];
   } 
-  // TODO: Allow token from cookie for web app if needed
+  // Also allow token from cookie for web app
+  else if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
   
   // Check if token exists
   if (!token) {
@@ -29,7 +32,7 @@ exports.protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || config.jwt.secret);
     
     // Get user from the token
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).populate('roleId', 'permissions');
     
     if (!user) {
       return res.status(401).json({
@@ -68,10 +71,42 @@ exports.authorize = (...roles) => {
       });
     }
     
+    // Check if user role is in the allowed roles
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: `Peran ${req.user.role} tidak memiliki akses ke endpoint ini`
+      });
+    }
+    
+    next();
+  };
+};
+
+// Permission authorization middleware
+exports.checkPermission = (...permissions) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Akses tidak diizinkan, silakan login terlebih dahulu'
+      });
+    }
+    
+    // Make sure user role is populated
+    if (!req.user.roleId) {
+      await req.user.populate('roleId', 'permissions');
+    }
+    
+    // Check if user has any of the required permissions
+    const hasPermission = permissions.some(permission => 
+      req.user.roleId.permissions.includes(permission)
+    );
+    
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: 'Anda tidak memiliki izin untuk mengakses resource ini'
       });
     }
     

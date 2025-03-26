@@ -20,6 +20,10 @@ exports.getUsers = asyncHandler(async (req, res) => {
   if (req.query.roleId) {
     filter.roleId = req.query.roleId;
   }
+
+  if (req.query.role) {
+    filter.role = req.query.role;
+  }
   
   if (req.query.aktif !== undefined) {
     filter.aktif = req.query.aktif === 'true';
@@ -106,7 +110,7 @@ exports.createUser = asyncHandler(async (req, res) => {
     });
   }
   
-  // Make sure roleId exists
+  // Get role to set role code
   if (req.body.roleId) {
     const role = await Role.findById(req.body.roleId);
     if (!role) {
@@ -115,6 +119,14 @@ exports.createUser = asyncHandler(async (req, res) => {
         message: 'Role tidak ditemukan'
       });
     }
+    
+    // Set role code based on role ID
+    req.body.role = role.kodeRole;
+  } else {
+    return res.status(400).json({
+      success: false,
+      message: 'RoleId harus diisi'
+    });
   }
   
   // Make sure cabangId exists
@@ -177,6 +189,9 @@ exports.createUser = asyncHandler(async (req, res) => {
     }
   }
   
+  // Log the userData before creating the user for debugging
+  console.log('Creating user with data:', JSON.stringify(userData, null, 2));
+
   // Create user
   const user = await User.create(userData);
   
@@ -227,7 +242,7 @@ exports.updateUser = asyncHandler(async (req, res) => {
     }
   }
   
-  // Make sure roleId exists if provided
+  // Update role code if roleId is provided
   if (req.body.roleId) {
     const role = await Role.findById(req.body.roleId);
     if (!role) {
@@ -236,6 +251,9 @@ exports.updateUser = asyncHandler(async (req, res) => {
         message: 'Role tidak ditemukan'
       });
     }
+    
+    // Update role code based on role ID
+    req.body.role = role.kodeRole;
   }
   
   // Make sure cabangId exists if provided

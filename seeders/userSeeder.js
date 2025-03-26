@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
+const Role = require('../models/Role');
 
 const userData = [
   {
@@ -12,7 +13,7 @@ const userData = [
     alamat: 'Jl. Direktur No. 1, Jakarta',
     username: 'ahmad.direktur',
     password: 'SamudraERP2024!',
-    cabangId: null, // akan diisi saat seeding
+    cabangId: null,
     fotoProfil: 'default.jpg',
     dokumen: {
       ktp: 'ktp_ahmad.pdf',
@@ -29,7 +30,7 @@ const userData = [
     alamat: 'Jl. Keuangan No. 2, Jakarta',
     username: 'budi.keuangan',
     password: 'SamudraERP2024!',
-    cabangId: null, // akan diisi saat seeding
+    cabangId: null,
     fotoProfil: 'default.jpg',
     dokumen: {
       ktp: 'ktp_budi.pdf',
@@ -46,7 +47,7 @@ const userData = [
     alamat: 'Jl. Operasional No. 3, Surabaya',
     username: 'ani.operasional',
     password: 'SamudraERP2024!',
-    cabangId: null, // akan diisi saat seeding
+    cabangId: null,
     fotoProfil: 'default.jpg',
     dokumen: {
       ktp: 'ktp_ani.pdf',
@@ -63,7 +64,7 @@ const userData = [
     alamat: 'Jl. Admin No. 4, Medan',
     username: 'rini.admin',
     password: 'SamudraERP2024!',
-    cabangId: null, // akan diisi saat seeding
+    cabangId: null,
     fotoProfil: 'default.jpg',
     dokumen: {
       ktp: 'ktp_rini.pdf'
@@ -79,7 +80,7 @@ const userData = [
     alamat: 'Jl. Supir No. 5, Jakarta',
     username: 'joko.supir',
     password: 'SamudraERP2024!',
-    cabangId: null, // akan diisi saat seeding
+    cabangId: null,
     fotoProfil: 'default.jpg',
     dokumen: {
       ktp: 'ktp_joko.pdf',
@@ -91,29 +92,42 @@ const userData = [
 
 const seedUsers = async () => {
   try {
-    // Hapus data existing
     await User.deleteMany({});
-    
-    // Ambil cabang yang sudah ada
-    const branches = await Branch.find({});
-    
+
+    const [branches, roles] = await Promise.all([
+      Branch.find({}),
+      Role.find({})
+    ]);
+
     if (branches.length === 0) {
-      throw new Error('Tidak ada cabang yang tersedia. Jalankan branch seeder terlebih dahulu.');
+      throw new Error('No branches available. Run branch seeder first.');
     }
-    
-    // Tambahkan cabang ke data user
-    const seedUserData = userData.map((user, index) => ({
-      ...user,
-      cabangId: branches[index % branches.length]._id
+
+    if (roles.length === 0) {
+      throw new Error('No roles available. Run role seeder first.');
+    }
+
+    const seedUserData = await Promise.all(userData.map(async (user, index) => {
+      const role = roles.find(r => r.kodeRole === user.role);
+      
+      if (!role) {
+        console.error(`Role not found for code: ${user.role}`);
+        throw new Error(`Role ${user.role} not found`);
+      }
+
+      return {
+        ...user,
+        cabangId: branches[index % branches.length]._id,
+        roleId: role._id
+      };
     }));
-    
-    // Tambahkan data baru
+
     const users = await User.create(seedUserData);
-    
-    console.log('User berhasil ditambahkan:', users.length);
+
+    console.log('Users added successfully:', users.length);
     return users;
   } catch (error) {
-    console.error('Gagal menambahkan user:', error);
+    console.error('Failed to add users:', error);
     throw error;
   }
 };

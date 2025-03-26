@@ -16,7 +16,9 @@ exports.login = async (req, res) => {
     }
 
     // Cek apakah user ada
-    const user = await User.findOne({ username }).select('+password');
+    const user = await User.findOne({ username }).select('+password')
+      .populate('cabangId', 'namaCabang alamat kota provinsi')
+      .populate('roleId', 'namaRole kodeRole permissions');
 
     if (!user) {
       return res.status(401).json({
@@ -46,16 +48,35 @@ exports.login = async (req, res) => {
     // Create token
     const token = user.getSignedJwtToken();
 
+    // Prepare user data to send back without sensitive info
+    const userData = {
+      id: user._id,
+      nama: user.nama,
+      email: user.email,
+      telepon: user.telepon,
+      alamat: user.alamat,
+      jabatan: user.jabatan,
+      role: user.role,
+      roleId: user.roleId._id,
+      permissions: user.roleId.permissions,
+      cabangId: user.cabangId._id,
+      cabang: {
+        id: user.cabangId._id,
+        namaCabang: user.cabangId.namaCabang,
+        alamat: user.cabangId.alamat,
+        kota: user.cabangId.kota,
+        provinsi: user.cabangId.provinsi
+      },
+      fotoProfil: user.fotoProfil,
+      aktif: user.aktif,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
+
     res.status(200).json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        nama: user.nama,
-        email: user.email,
-        role: user.role,
-        cabangId: user.cabangId
-      }
+      user: userData
     });
   } catch (error) {
     res.status(500).json({
@@ -66,16 +87,121 @@ exports.login = async (req, res) => {
   }
 };
 
+// @desc      Register new user
+// @route     POST /api/auth/register
+// @access    Private (only admin can register users)
+exports.register = async (req, res) => {
+  try {
+    const { nama, username, email, password, jabatan, roleId, telepon, alamat, cabangId } = req.body;
+
+    // Check if username or email already exists
+    const existingUser = await User.findOne({
+      $or: [
+        { username },
+        { email }
+      ]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username atau email sudah terdaftar'
+      });
+    }
+
+    // Get role to set role code
+    const role = await Role.findById(roleId);
+    if (!role) {
+      return res.status(404).json({
+        success: false,
+        message: 'Role tidak ditemukan'
+      });
+    }
+
+    // Create user
+    const user = await User.create({
+      nama,
+      username,
+      email,
+      password,
+      jabatan,
+      roleId,
+      role: role.kodeRole, // Set role code based on role ID
+      telepon,
+      alamat,
+      cabangId,
+      aktif: true
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Registrasi berhasil',
+      data: {
+        id: user._id,
+        nama: user.nama,
+        email: user.email,
+        username: user.username,
+        jabatan: user.jabatan,
+        role: user.role,
+        telepon: user.telepon,
+        alamat: user.alamat,
+        cabangId: user.cabangId,
+        aktif: user.aktif
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Gagal registrasi',
+      error: error.message
+    });
+  }
+};
+
 // @desc      Get current logged in user
 // @route     GET /api/auth/me
 // @access    Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).populate('cabangId');
+    const user = await User.findById(req.user.id)
+      .populate('cabangId', 'namaCabang alamat kota provinsi')
+      .populate('roleId', 'namaRole kodeRole permissions');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User tidak ditemukan'
+      });
+    }
+
+    // Prepare user data to send back
+    const userData = {
+      id: user._id,
+      nama: user.nama,
+      email: user.email,
+      telepon: user.telepon,
+      alamat: user.alamat,
+      jabatan: user.jabatan,
+      role: user.role,
+      roleId: user.roleId._id,
+      permissions: user.roleId.permissions,
+      cabangId: user.cabangId._id,
+      cabang: {
+        id: user.cabangId._id,
+        namaCabang: user.cabangId.namaCabang,
+        alamat: user.cabangId.alamat,
+        kota: user.cabangId.kota,
+        provinsi: user.cabangId.provinsi
+      },
+      fotoProfil: user.fotoProfil,
+      aktif: user.aktif,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
 
     res.status(200).json({
       success: true,
-      data: user
+      data: userData
     });
   } catch (error) {
     res.status(500).json({

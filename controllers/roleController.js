@@ -39,13 +39,18 @@ exports.getRole = asyncHandler(async (req, res) => {
 // @route     POST /api/roles
 // @access    Private
 exports.createRole = asyncHandler(async (req, res) => {
-  // Check if role with name already exists
-  const existingRole = await Role.findOne({ namaRole: req.body.namaRole });
+  // Check if role with name or code already exists
+  const existingRole = await Role.findOne({ 
+    $or: [
+      { namaRole: req.body.namaRole },
+      { kodeRole: req.body.kodeRole }
+    ] 
+  });
   
   if (existingRole) {
     return res.status(400).json({
       success: false,
-      message: 'Role dengan nama ini sudah ada'
+      message: 'Role dengan nama atau kode ini sudah ada'
     });
   }
 
@@ -61,17 +66,24 @@ exports.createRole = asyncHandler(async (req, res) => {
 // @route     PUT /api/roles/:id
 // @access    Private
 exports.updateRole = asyncHandler(async (req, res) => {
-  // Check if role name already exists (for different role)
-  if (req.body.namaRole) {
-    const existingRole = await Role.findOne({
-      namaRole: req.body.namaRole,
-      _id: { $ne: req.params.id }
-    });
+  // Check if role name or code already exists (for different role)
+  if (req.body.namaRole || req.body.kodeRole) {
+    const query = { _id: { $ne: req.params.id } };
+    
+    if (req.body.namaRole) {
+      query.namaRole = req.body.namaRole;
+    }
+    
+    if (req.body.kodeRole) {
+      query.kodeRole = req.body.kodeRole;
+    }
+    
+    const existingRole = await Role.findOne(query);
     
     if (existingRole) {
       return res.status(400).json({
         success: false,
-        message: 'Role dengan nama ini sudah ada'
+        message: 'Role dengan nama atau kode ini sudah ada'
       });
     }
   }

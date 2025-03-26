@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const colors = require('colors'); // Add colors for console formatting
+const colors = require('colors');
 
 // Import seed functions
 const seedDivisions = require('./divisionSeeder');
@@ -20,28 +20,30 @@ const runSeeders = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log('Koneksi database berhasil'.cyan.underline);
+    console.log('Database connection successful'.cyan.underline);
 
-    // Jalankan seeder dalam urutan yang benar
+    // Clear existing database
+    await mongoose.connection.dropDatabase();
+    
+    console.log('Seeding roles...'.yellow);
+    await seedRoles();
+    
     console.log('Seeding divisions...'.yellow);
     await seedDivisions();
     
     console.log('Seeding branches...'.yellow);
     await seedBranches();
     
-    console.log('Seeding roles...'.yellow);
-    await seedRoles();
-    
     console.log('Seeding users...'.yellow);
     await seedUsers();
 
-    console.log('Seeding berhasil diselesaikan'.green.bold);
+    console.log('Seeding completed successfully'.green.bold);
     
     // Tutup koneksi database
     await mongoose.connection.close();
     process.exit(0);
   } catch (error) {
-    console.error('Gagal melakukan seeding:'.red, error);
+    console.error('Seeding failed:'.red, error);
     process.exit(1);
   }
 };

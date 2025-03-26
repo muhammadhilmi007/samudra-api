@@ -1,12 +1,6 @@
 // routes/roleRoutes.js
 const express = require('express');
-const {
-  getRoles,
-  getRole,
-  createRole,
-  updateRole,
-  deleteRole
-} = require('../controllers/roleController');
+const { getRoles, getRole, createRole, updateRole, deleteRole } = require('../controllers/roleController');
 const { protect, authorize } = require('../middlewares/auth');
 const { validateObjectId, validateBody } = require('../middlewares/validator');
 const { roleSchema } = require('../utils/validators');

@@ -18,6 +18,11 @@ const UserSchema = new mongoose.Schema({
     ref: 'Role',
     required: [true, 'Role harus diisi']
   },
+  // Tambahkan role untuk menyimpan kode role
+  role: {
+    type: String,
+    required: [true, 'Kode role harus diisi']
+  },
   email: {
     type: String,
     match: [
@@ -85,7 +90,7 @@ UserSchema.virtual('cabang', {
   justOne: true
 });
 
-UserSchema.virtual('role', {
+UserSchema.virtual('roleData', {
   ref: 'Role',
   localField: 'roleId',
   foreignField: '_id',
@@ -94,16 +99,21 @@ UserSchema.virtual('role', {
 
 // Encrypt password using bcrypt
 UserSchema.pre('save', async function(next) {
-  // Only hash password if it was modified
-  if (!this.isModified('password')) {
-    next();
-  }
-
   // Set updatedAt when document is modified
   this.updatedAt = Date.now();
 
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  // Only hash password if it was modified
+  if (!this.isModified('password')) {
+    return next();
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Update updatedAt on update
@@ -113,14 +123,32 @@ UserSchema.pre('findOneAndUpdate', function() {
 
 // Sign JWT and return
 UserSchema.methods.getSignedJwtToken = function() {
-  return jwt.sign({ id: this._id }, process.env.JWT_SECRET || 'samplesecret123', {
-    expiresIn: process.env.JWT_EXPIRE || '30d'
-  });
+  return jwt.sign(
+    { id: this._id }, 
+    process.env.JWT_SECRET || 'samudraerp2024secretkey', 
+    {
+      expiresIn: process.env.JWT_EXPIRE || '30d'
+    }
+  );
 };
 
 // Match password
 UserSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Check if user has permission
+UserSchema.methods.hasPermission = async function(permission) {
+  // Populate the role if not already populated
+  await this.populate('roleData');
+  
+  // Check if user has the role data
+  if (!this.roleData) {
+    return false;
+  }
+  
+  // Check if the user has the specified permission
+  return this.roleData.permissions.includes(permission);
 };
 
 module.exports = mongoose.model('User', UserSchema);
