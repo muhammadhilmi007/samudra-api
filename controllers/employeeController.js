@@ -115,7 +115,7 @@ exports.createEmployee = asyncHandler(async (req, res) => {
     });
   }
   
-  // Check if roleId is valid
+  // Check if roleId is valid and get the role code
   const role = await Role.findById(req.body.roleId);
   if (!role) {
     return res.status(400).json({
@@ -123,6 +123,9 @@ exports.createEmployee = asyncHandler(async (req, res) => {
       message: 'Role tidak valid'
     });
   }
+  
+  // Add the role code to the employee data
+  const employeeData = { ...req.body, role: role.kodeRole };
   
   // Check if cabangId is valid
   const branch = await Branch.findById(req.body.cabangId);
@@ -134,8 +137,6 @@ exports.createEmployee = asyncHandler(async (req, res) => {
   }
   
   // Process file uploads
-  const employeeData = { ...req.body };
-  
   if (req.files) {
     // Handle profile photo
     if (req.files.fotoProfil) {
