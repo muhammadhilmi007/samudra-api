@@ -5,7 +5,9 @@ const divisionData = [
   { namaDivisi: 'Logistik Nasional' },
   { namaDivisi: 'Distribusi Regional' },
   { namaDivisi: 'Ekspedisi Khusus' },
-  { namaDivisi: 'Layanan Kargo' }
+  { namaDivisi: 'Layanan Kargo' },
+  { namaDivisi: 'Supir' },
+  { namaDivisi: 'Kenek' }
 ];
 
 const seedDivisions = async () => {

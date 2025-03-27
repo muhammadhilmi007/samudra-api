@@ -254,7 +254,16 @@ const roleData = [
       'read_stt',
       'tracking_only'
     ]
-  }
+  },
+  {
+    namaRole: 'Kenek',
+    kodeRole: 'kenek',
+    deskripsi: 'Asisten driver kendaraan',
+    permissions: [
+      'read_stt',
+      'tracking_only'
+    ]
+  },
 ];
 
 const seedRoles = async () => {

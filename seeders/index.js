@@ -7,6 +7,8 @@ const seedDivisions = require('./divisionSeeder');
 const seedBranches = require('./branchSeeder');
 const seedRoles = require('./roleSeeder');
 const seedUsers = require('./userSeeder');
+const seedVehicles = require('./vehicleSeeder');
+const seedVehicleQueues = require('./vehicleQueueSeeder');
 
 // Konfigurasi environment
 dotenv.config();
@@ -36,6 +38,12 @@ const runSeeders = async () => {
     
     console.log('Seeding users...'.yellow);
     await seedUsers();
+
+    console.log('Seeding vehicles...'.yellow);
+    await seedVehicles();
+
+    console.log('Seeding vehicle queues...'.yellow);
+    await seedVehicleQueues();
 
     console.log('Seeding completed successfully'.green.bold);
     

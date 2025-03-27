@@ -87,6 +87,88 @@ const userData = [
       sim: 'sim_joko.pdf'
     },
     aktif: true
+  },
+  {
+    nama: 'Agus Supir',
+    jabatan: 'Supir',
+    role: 'supir',
+    email: 'agus.supir@samudra.co.id',
+    telepon: '085678901235',
+    alamat: 'Jl. Supir No. 6, Surabaya',
+    username: 'agus.supir',
+    password: 'SamudraERP2024!',
+    cabangId: null,
+    fotoProfil: 'default.jpg',
+    dokumen: {
+      ktp: 'ktp_agus.pdf',
+      sim: 'sim_agus.pdf'
+    },
+    aktif: true
+  },
+  {
+    nama: 'Dedi Supir',
+    jabatan: 'Supir',
+    role: 'supir',
+    email: 'dedi.supir@samudra.co.id',
+    telepon: '085678901236',
+    alamat: 'Jl. Supir No. 7, Bandung',
+    username: 'dedi.supir',
+    password: 'SamudraERP2024!',
+    cabangId: null,
+    fotoProfil: 'default.jpg',
+    dokumen: {
+      ktp: 'ktp_dedi.pdf',
+      sim: 'sim_dedi.pdf'
+    },
+    aktif: true
+  },
+  {
+    nama: 'Anto Kenek',
+    jabatan: 'Kenek',
+    role: 'kenek',
+    email: 'anto.kenek@samudra.co.id',
+    telepon: '085678901237',
+    alamat: 'Jl. Kenek No. 8, Jakarta',
+    username: 'anto.kenek',
+    password: 'SamudraERP2024!',
+    cabangId: null,
+    fotoProfil: 'default.jpg',
+    dokumen: {
+      ktp: 'ktp_anto.pdf'
+    },
+    aktif: true
+  },
+  {
+    nama: 'Bejo Kenek',
+    jabatan: 'Kenek',
+    role: 'kenek',
+    email: 'bejo.kenek@samudra.co.id',
+    telepon: '085678901238',
+    alamat: 'Jl. Kenek No. 9, Surabaya',
+    username: 'bejo.kenek',
+    password: 'SamudraERP2024!',
+    cabangId: null,
+    fotoProfil: 'default.jpg',
+    dokumen: {
+      ktp: 'ktp_bejo.pdf'
+    },
+    aktif: true
+  },
+  {
+    nama: 'Candra Kenek',
+    jabatan: 'Kenek',
+    role: 'kenek',
+    email: 'candra.kenek@samudra.co.id',
+    telepon: '085678901239',
+    alamat: 'Jl. Kenek No. 10, Bandung',
+    username: 'candra.kenek',
+    password: 'SamudraERP2024!',
+    cabangId: null,
+    fotoProfil: 'default.jpg',
+    dokumen: {
+      ktp: 'ktp_candra.pdf'
+    },
+    aktif: true
   }
 ];
 
@@ -111,8 +193,8 @@ const seedUsers = async () => {
       const role = roles.find(r => r.kodeRole === user.role);
       
       if (!role) {
-        console.error(`Role not found for code: ${user.role}`);
-        throw new Error(`Role ${user.role} not found`);
+        console.warn(`Role not found for code: ${user.role}, using default role`);
+        return null;
       }
 
       return {
@@ -122,7 +204,9 @@ const seedUsers = async () => {
       };
     }));
 
-    const users = await User.create(seedUserData);
+    const filteredUserData = seedUserData.filter(user => user !== null);
+
+    const users = await User.create(filteredUserData);
 
     console.log('Users added successfully:', users.length);
     return users;

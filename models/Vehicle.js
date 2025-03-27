@@ -1,3 +1,4 @@
+// models/Vehicle.js
 const mongoose = require('mongoose');
 
 const VehicleSchema = new mongoose.Schema({
@@ -13,13 +14,16 @@ const VehicleSchema = new mongoose.Schema({
   },
   supirId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
+    required: [true, 'Supir harus diisi']
   },
   noTeleponSupir: {
-    type: String
+    type: String,
+    required: [true, 'Nomor telepon supir harus diisi']
   },
   noKTPSupir: {
-    type: String
+    type: String,
+    required: [true, 'Nomor KTP supir harus diisi']
   },
   fotoKTPSupir: {
     type: String
@@ -28,7 +32,8 @@ const VehicleSchema = new mongoose.Schema({
     type: String
   },
   alamatSupir: {
-    type: String
+    type: String,
+    required: [true, 'Alamat supir harus diisi']
   },
   kenekId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -72,9 +77,18 @@ const VehicleSchema = new mongoose.Schema({
   }
 });
 
-// Update updatedAt pada update
+// Update updatedAt on update
 VehicleSchema.pre('findOneAndUpdate', function() {
   this.set({ updatedAt: Date.now() });
 });
+
+// Virtual properties for displaying formatted type in frontend
+VehicleSchema.virtual('tipeDisplay').get(function() {
+  return this.tipe === 'lansir' ? 'Lansir' : 'Antar Cabang';
+});
+
+// Make virtuals available when converting to JSON
+VehicleSchema.set('toJSON', { virtuals: true });
+VehicleSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Vehicle', VehicleSchema);
