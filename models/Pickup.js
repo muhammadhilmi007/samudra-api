@@ -1,3 +1,4 @@
+// models/Pickup.js
 const mongoose = require('mongoose');
 
 const PickupSchema = new mongoose.Schema({
@@ -43,6 +44,19 @@ const PickupSchema = new mongoose.Schema({
   estimasiPengambilan: {
     type: String
   },
+  alamatPengambilan: {
+    type: String,
+    required: [true, 'Alamat pengambilan harus diisi']
+  },
+  tujuan: {
+    type: String,
+    required: [true, 'Tujuan harus diisi']
+  },
+  jumlahColly: {
+    type: Number,
+    required: [true, 'Jumlah colly harus diisi'],
+    min: [1, 'Jumlah colly minimal 1']
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -52,6 +66,11 @@ const PickupSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch',
     required: [true, 'Cabang harus diisi']
+  },
+  status: {
+    type: String,
+    enum: ['PENDING', 'BERANGKAT', 'SELESAI', 'CANCELLED'],
+    default: 'PENDING'
   },
   createdAt: {
     type: Date,
@@ -63,14 +82,13 @@ const PickupSchema = new mongoose.Schema({
   }
 });
 
-// Update updatedAt pada update
+// Update updatedAt on update
 PickupSchema.pre('findOneAndUpdate', function() {
   this.set({ updatedAt: Date.now() });
 });
 
-// Generate nomor pengambilan otomatis sebelum save
+// Generate pickup number automatically before save
 PickupSchema.pre('save', async function(next) {
-  // Format: PKP-{CABANG_CODE}-{YYMMDD}-{COUNTER}
   if (this.isNew) {
     try {
       const Branch = mongoose.model('Branch');
@@ -80,14 +98,14 @@ PickupSchema.pre('save', async function(next) {
         throw new Error('Cabang tidak ditemukan');
       }
       
-      // Ambil kode cabang (3 huruf pertama)
+      // Get branch code (first 3 letters)
       const branchCode = branch.namaCabang.substring(0, 3).toUpperCase();
       
-      // Format tanggal YYMMDD
+      // Format date YYMMDD
       const now = new Date();
       const dateStr = now.toISOString().slice(2, 10).replace(/-/g, '');
       
-      // Cari pickup terakhir dengan format yang sama untuk hari ini
+      // Find the last pickup with the same format for today
       const lastPickup = await this.constructor.findOne({
         noPengambilan: new RegExp(`PKP-${branchCode}-${dateStr}-`)
       }).sort({ noPengambilan: -1 });
@@ -95,15 +113,15 @@ PickupSchema.pre('save', async function(next) {
       let counter = 1;
       
       if (lastPickup) {
-        // Extract counter dari nomor terakhir
+        // Extract counter from last number
         const lastCounter = parseInt(lastPickup.noPengambilan.split('-')[3]);
         counter = lastCounter + 1;
       }
       
-      // Format counter dengan leading zeros
+      // Format counter with leading zeros
       const counterStr = counter.toString().padStart(4, '0');
       
-      // Set nomor pengambilan
+      // Set pickup number
       this.noPengambilan = `PKP-${branchCode}-${dateStr}-${counterStr}`;
       
       next();

@@ -1,3 +1,4 @@
+// seeders/index.js
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const colors = require("colors");
@@ -9,15 +10,16 @@ const seedRoles = require("./roleSeeder");
 const seedUsers = require("./userSeeder");
 const seedVehicles = require("./vehicleSeeder");
 const seedVehicleQueues = require("./vehicleQueueSeeder");
+const seedPickupRequests = require("./pickupRequestSeeder");
 const seedPickups = require("./pickupSeeder");
 
-// Konfigurasi environment
+// Configure environment
 dotenv.config();
 
-// Fungsi utama untuk menjalankan seeder
+// Main function to run seeders
 const runSeeders = async () => {
   try {
-    // Sambungkan ke database - changed MONGODB_URI to MONGO_URI to match your .env
+    // Connect to database
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -25,8 +27,13 @@ const runSeeders = async () => {
 
     console.log("Database connection successful".cyan.underline);
 
-    // Clear existing database
-    await mongoose.connection.dropDatabase();
+    // Clear existing database if in development (be careful with this!)
+    if (process.env.NODE_ENV === 'development') {
+      if (process.env.SEED_CLEAR_DB === 'true') {
+        console.log("Clearing database...".yellow);
+        await mongoose.connection.dropDatabase();
+      }
+    }
 
     console.log("Seeding roles...".yellow);
     await seedRoles();
@@ -46,12 +53,15 @@ const runSeeders = async () => {
     console.log("Seeding vehicle queues...".yellow);
     await seedVehicleQueues();
 
+    console.log("Seeding pickup requests...".yellow);
+    await seedPickupRequests();
+
     console.log("Seeding pickups...".yellow);
     await seedPickups();
 
     console.log("Seeding completed successfully".green.bold);
 
-    // Tutup koneksi database
+    // Close database connection
     await mongoose.connection.close();
     process.exit(0);
   } catch (error) {
@@ -60,5 +70,5 @@ const runSeeders = async () => {
   }
 };
 
-// Jalankan seeder
+// Execute seeders
 runSeeders();

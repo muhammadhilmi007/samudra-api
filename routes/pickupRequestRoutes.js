@@ -1,3 +1,4 @@
+// routes/pickupRequestRoutes.js
 const express = require('express');
 const {
   getPickupRequests,
@@ -9,8 +10,6 @@ const {
   deletePickupRequest
 } = require('../controllers/pickupRequestController');
 const { protect, authorize } = require('../middlewares/auth');
-const { validateBody, validateObjectId } = require('../middlewares/validator');
-const { pickupRequestSchema } = require('../utils/validators');
 
 const router = express.Router();
 
@@ -23,18 +22,18 @@ router.get('/pending', getPendingPickupRequests);
 // Status update route
 router
   .route('/:id/status')
-  .put(validateObjectId(), authorize('staff_admin', 'kepala_cabang', 'kepala_gudang', 'supir'), updatePickupRequestStatus);
+  .put(authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), updatePickupRequestStatus);
 
 // CRUD routes
 router
   .route('/')
   .get(getPickupRequests)
-  .post(validateBody(pickupRequestSchema), createPickupRequest);
+  .post(authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), createPickupRequest);
 
 router
   .route('/:id')
-  .get(validateObjectId(), getPickupRequest)
-  .put(validateObjectId(), validateBody(pickupRequestSchema), authorize('staff_admin', 'kepala_cabang'), updatePickupRequest)
-  .delete(validateObjectId(), authorize('staff_admin', 'kepala_cabang'), deletePickupRequest);
+  .get(getPickupRequest)
+  .put(authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), updatePickupRequest)
+  .delete(authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang'), deletePickupRequest);
 
 module.exports = router;

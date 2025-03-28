@@ -1,3 +1,4 @@
+// models/PickupRequest.js
 const mongoose = require('mongoose');
 
 const PickupRequestSchema = new mongoose.Schema({
@@ -49,7 +50,7 @@ const PickupRequestSchema = new mongoose.Schema({
   }
 });
 
-// Update updatedAt pada update
+// Update updatedAt on update
 PickupRequestSchema.pre('findOneAndUpdate', function() {
   this.set({ updatedAt: Date.now() });
 });

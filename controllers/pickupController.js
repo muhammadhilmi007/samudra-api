@@ -1,25 +1,25 @@
+// controllers/pickupController.js
 const Pickup = require("../models/Pickup");
 const Vehicle = require("../models/Vehicle");
 const Customer = require("../models/Customer");
 const STT = require("../models/STT");
 const { paginationResult } = require("../utils/helpers");
-const config = require("../config/config");
 
 // @desc      Get all pickups
 // @route     GET /api/pickups
 // @access    Private
 exports.getPickups = async (req, res) => {
   try {
-    // Filter berdasarkan query
+    // Filter based on query
     const filter = {};
 
     if (req.query.cabangId) {
       filter.cabangId = req.query.cabangId;
     } else if (
       req.user.role !== "direktur" &&
-      req.user.role !== "manajer_operasional"
+      req.user.role !== "manajerOperasional"
     ) {
-      // Jika bukan direktur atau manajer operasional, hanya tampilkan pengambilan di cabang sendiri
+      // If not director or operations manager, only show pickups in your own branch
       filter.cabangId = req.user.cabangId;
     }
 
@@ -33,6 +33,34 @@ exports.getPickups = async (req, res) => {
 
     if (req.query.kendaraanId) {
       filter.kendaraanId = req.query.kendaraanId;
+    }
+    
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+    
+    // Search by text
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      
+      // Get customer IDs that match the search
+      const customers = await Customer.find({
+        nama: { $regex: searchRegex }
+      }).select('_id');
+      
+      const customerIds = customers.map(customer => customer._id);
+      
+      // Search in multiple fields
+      filter.$or = [
+        { noPengambilan: { $regex: searchRegex } },
+        { alamatPengambilan: { $regex: searchRegex } },
+        { tujuan: { $regex: searchRegex } }
+      ];
+      
+      // Add customer IDs to the search
+      if (customerIds.length > 0) {
+        filter.$or.push({ pengirimId: { $in: customerIds } });
+      }
     }
 
     // Date range filter
@@ -125,7 +153,7 @@ exports.getPickup = async (req, res) => {
 // @access    Private
 exports.createPickup = async (req, res) => {
   try {
-    // Validasi data
+    // Validate data
     if (!req.body.pengirimId) {
       return res.status(400).json({
         success: false,
@@ -146,8 +174,15 @@ exports.createPickup = async (req, res) => {
         message: "Kendaraan harus diisi",
       });
     }
+    
+    if (!req.body.alamatPengambilan) {
+      return res.status(400).json({
+        success: false,
+        message: "Alamat pengambilan harus diisi",
+      });
+    }
 
-    // Cek apakah pengirim ada
+    // Check if sender exists
     const pengirim = await Customer.findById(req.body.pengirimId);
     if (!pengirim) {
       return res.status(404).json({
@@ -156,7 +191,7 @@ exports.createPickup = async (req, res) => {
       });
     }
 
-    // Cek apakah kendaraan ada
+    // Check if vehicle exists
     const kendaraan = await Vehicle.findById(req.body.kendaraanId);
     if (!kendaraan) {
       return res.status(404).json({
@@ -165,33 +200,26 @@ exports.createPickup = async (req, res) => {
       });
     }
 
-    // Set userId dan cabangId dari user yang login
+    // Set userId and cabangId from logged in user
     req.body.userId = req.user.id;
-    req.body.cabangId = req.user.cabangId;
+    
+    // Use branch from body if provided, otherwise use user's branch
+    if (!req.body.cabangId) {
+      req.body.cabangId = req.user.cabangId;
+    }
 
-    // Set tanggal jika tidak disediakan
+    // Set date if not provided
     if (!req.body.tanggal) {
       req.body.tanggal = new Date();
     }
+    
+    // Set default status
+    req.body.status = 'PENDING';
 
-    // Generate noPengambilan
-    const today = new Date();
-    const dateString = today.toISOString().slice(0, 10).replace(/-/g, "");
-    const count =
-      (await Pickup.countDocuments({
-        tanggal: {
-          $gte: new Date(today.setHours(0, 0, 0, 0)),
-          $lt: new Date(today.setHours(23, 59, 59, 999)),
-        },
-      })) + 1;
-
-    const noPengambilan = `PU${dateString}${count.toString().padStart(4, "0")}`;
-    req.body.noPengambilan = noPengambilan;
-
-    // Buat pickup baru
+    // Create pickup
     const pickup = await Pickup.create(req.body);
 
-    // Populate data untuk response
+    // Populate data for response
     const populatedPickup = await Pickup.findById(pickup._id)
       .populate("pengirimId", "nama alamat telepon")
       .populate("supirId", "nama")
@@ -219,7 +247,7 @@ exports.createPickup = async (req, res) => {
 // @access    Private
 exports.updatePickup = async (req, res) => {
   try {
-    // Validasi data jika diupdate
+    // Validate data if being updated
     if (req.body.pengirimId) {
       const pengirim = await Customer.findById(req.body.pengirimId);
       if (!pengirim) {
@@ -286,7 +314,7 @@ exports.deletePickup = async (req, res) => {
       });
     }
 
-    // Cek apakah ada STT yang terkait
+    // Check if there are STTs associated
     if (pickup.sttIds && pickup.sttIds.length > 0) {
       return res.status(400).json({
         success: false,
@@ -332,7 +360,7 @@ exports.addSTTToPickup = async (req, res) => {
       });
     }
 
-    // Validasi setiap STT
+    // Validate each STT
     for (const sttId of sttIds) {
       const stt = await STT.findById(sttId);
 
@@ -343,7 +371,8 @@ exports.addSTTToPickup = async (req, res) => {
         });
       }
 
-      // Cek apakah STT sudah ada di pickup lain
+      // controllers/pickupController.js (continued)
+      // Check if STT already exists in another pickup
       const existingPickup = await Pickup.findOne({
         _id: { $ne: req.params.id },
         sttIds: sttId,
@@ -356,7 +385,7 @@ exports.addSTTToPickup = async (req, res) => {
         });
       }
 
-      // Tambahkan STT ke pickup jika belum ada
+      // Add STT to pickup if not already included
       if (!pickup.sttIds.includes(sttId)) {
         pickup.sttIds.push(sttId);
       }
@@ -364,7 +393,7 @@ exports.addSTTToPickup = async (req, res) => {
 
     await pickup.save();
 
-    // Populate data untuk response
+    // Populate data for response
     const populatedPickup = await Pickup.findById(pickup._id)
       .populate("pengirimId", "nama alamat telepon")
       .populate("supirId", "nama")
@@ -413,7 +442,7 @@ exports.removeSTTFromPickup = async (req, res) => {
       });
     }
 
-    // Cek apakah STT ada di pickup
+    // Check if STT exists in pickup
     if (!pickup.sttIds.includes(sttId)) {
       return res.status(400).json({
         success: false,
@@ -421,11 +450,11 @@ exports.removeSTTFromPickup = async (req, res) => {
       });
     }
 
-    // Hapus STT dari pickup
+    // Remove STT from pickup
     pickup.sttIds = pickup.sttIds.filter((id) => id.toString() !== sttId);
     await pickup.save();
 
-    // Populate data untuk response
+    // Populate data for response
     const populatedPickup = await Pickup.findById(pickup._id)
       .populate("pengirimId", "nama alamat telepon")
       .populate("supirId", "nama")
@@ -482,7 +511,6 @@ exports.getPickupsBySender = async (req, res) => {
   }
 };
 
-// Add to controllers/pickupController.js
 // @desc      Update pickup status
 // @route     PUT /api/pickups/:id/status
 // @access    Private
