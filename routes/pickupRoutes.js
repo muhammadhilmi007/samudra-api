@@ -1,3 +1,4 @@
+// routes/pickupRoutes.js - Improved version
 const express = require('express');
 const {
   getPickups,
@@ -7,10 +8,10 @@ const {
   deletePickup,
   addSTTToPickup,
   removeSTTFromPickup,
-  getPickupsBySender
+  getPickupsBySender,
+  updatePickupStatus
 } = require('../controllers/pickupController');
 const { protect, authorize } = require('../middlewares/auth');
-const { validateBody, validateObjectId } = require('../middlewares/validator');
 
 const router = express.Router();
 
@@ -18,20 +19,21 @@ const router = express.Router();
 router.use(protect);
 
 // Special routes
-router.get('/by-sender/:senderId', validateObjectId('senderId'), getPickupsBySender);
-router.put('/:id/add-stt', validateObjectId(), authorize('kepala_cabang', 'kepala_gudang', 'staff_admin'), addSTTToPickup);
-router.put('/:id/remove-stt', validateObjectId(), authorize('kepala_cabang', 'kepala_gudang', 'staff_admin'), removeSTTFromPickup);
+router.get('/by-sender/:senderId', getPickupsBySender);
+router.put('/:id/add-stt', addSTTToPickup);
+router.put('/:id/remove-stt', removeSTTFromPickup);
+router.put('/:id/status', updatePickupStatus);
 
 // CRUD routes
 router
   .route('/')
   .get(getPickups)
-  .post(authorize('kepala_cabang', 'kepala_gudang', 'staff_admin'), createPickup);
+  .post(authorize('admin', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), createPickup);
 
 router
   .route('/:id')
-  .get(validateObjectId(), getPickup)
-  .put(validateObjectId(), authorize('kepala_cabang', 'kepala_gudang', 'staff_admin'), updatePickup)
-  .delete(validateObjectId(), authorize('direktur', 'kepala_cabang', 'kepala_gudang'), deletePickup);
+  .get(getPickup)
+  .put(authorize('admin', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), updatePickup)
+  .delete(authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang'), deletePickup);
 
 module.exports = router;

@@ -1,14 +1,15 @@
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const colors = require('colors');
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const colors = require("colors");
 
 // Import seed functions
-const seedDivisions = require('./divisionSeeder');
-const seedBranches = require('./branchSeeder');
-const seedRoles = require('./roleSeeder');
-const seedUsers = require('./userSeeder');
-const seedVehicles = require('./vehicleSeeder');
-const seedVehicleQueues = require('./vehicleQueueSeeder');
+const seedDivisions = require("./divisionSeeder");
+const seedBranches = require("./branchSeeder");
+const seedRoles = require("./roleSeeder");
+const seedUsers = require("./userSeeder");
+const seedVehicles = require("./vehicleSeeder");
+const seedVehicleQueues = require("./vehicleQueueSeeder");
+const seedPickups = require("./pickupSeeder");
 
 // Konfigurasi environment
 dotenv.config();
@@ -22,36 +23,39 @@ const runSeeders = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log('Database connection successful'.cyan.underline);
+    console.log("Database connection successful".cyan.underline);
 
     // Clear existing database
     await mongoose.connection.dropDatabase();
-    
-    console.log('Seeding roles...'.yellow);
+
+    console.log("Seeding roles...".yellow);
     await seedRoles();
-    
-    console.log('Seeding divisions...'.yellow);
+
+    console.log("Seeding divisions...".yellow);
     await seedDivisions();
-    
-    console.log('Seeding branches...'.yellow);
+
+    console.log("Seeding branches...".yellow);
     await seedBranches();
-    
-    console.log('Seeding users...'.yellow);
+
+    console.log("Seeding users...".yellow);
     await seedUsers();
 
-    console.log('Seeding vehicles...'.yellow);
+    console.log("Seeding vehicles...".yellow);
     await seedVehicles();
 
-    console.log('Seeding vehicle queues...'.yellow);
+    console.log("Seeding vehicle queues...".yellow);
     await seedVehicleQueues();
 
-    console.log('Seeding completed successfully'.green.bold);
-    
+    console.log("Seeding pickups...".yellow);
+    await seedPickups();
+
+    console.log("Seeding completed successfully".green.bold);
+
     // Tutup koneksi database
     await mongoose.connection.close();
     process.exit(0);
   } catch (error) {
-    console.error('Seeding failed:'.red, error);
+    console.error("Seeding failed:".red, error);
     process.exit(1);
   }
 };
