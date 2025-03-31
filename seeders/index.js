@@ -4,14 +4,15 @@ const dotenv = require("dotenv");
 const colors = require("colors");
 
 // Import seed functions
-const seedDivisions = require("./divisionSeeder");
-const seedBranches = require("./branchSeeder");
-const seedRoles = require("./roleSeeder");
-const seedUsers = require("./userSeeder");
-const seedVehicles = require("./vehicleSeeder");
-const seedVehicleQueues = require("./vehicleQueueSeeder");
-const seedPickupRequests = require("./pickupRequestSeeder");
-const seedPickups = require("./pickupSeeder");
+// const seedDivisions = require("./divisionSeeder");
+// const seedBranches = require("./branchSeeder");
+// const seedRoles = require("./roleSeeder");
+// const seedUsers = require("./userSeeder");
+// const seedVehicles = require("./vehicleSeeder");
+// const seedVehicleQueues = require("./vehicleQueueSeeder");
+// const seedPickupRequests = require("./pickupRequestSeeder");
+// const seedPickups = require("./pickupSeeder");
+const seedEmployeeData = require('./employeeSeeder');
 
 // Configure environment
 dotenv.config();
@@ -35,29 +36,32 @@ const runSeeders = async () => {
       }
     }
 
-    console.log("Seeding roles...".yellow);
-    await seedRoles();
+    console.log('Running employee seeder...');
+    await seedEmployeeData();
 
-    console.log("Seeding divisions...".yellow);
-    await seedDivisions();
+    // console.log("Seeding roles...".yellow);
+    // await seedRoles();
 
-    console.log("Seeding branches...".yellow);
-    await seedBranches();
+    // console.log("Seeding divisions...".yellow);
+    // await seedDivisions();
 
-    console.log("Seeding users...".yellow);
-    await seedUsers();
+    // console.log("Seeding branches...".yellow);
+    // await seedBranches();
 
-    console.log("Seeding vehicles...".yellow);
-    await seedVehicles();
+    // console.log("Seeding users...".yellow);
+    // await seedUsers();
 
-    console.log("Seeding vehicle queues...".yellow);
-    await seedVehicleQueues();
+    // console.log("Seeding vehicles...".yellow);
+    // await seedVehicles();
 
-    console.log("Seeding pickup requests...".yellow);
-    await seedPickupRequests();
+    // console.log("Seeding vehicle queues...".yellow);
+    // await seedVehicleQueues();
 
-    console.log("Seeding pickups...".yellow);
-    await seedPickups();
+    // console.log("Seeding pickup requests...".yellow);
+    // await seedPickupRequests();
+
+    // console.log("Seeding pickups...".yellow);
+    // await seedPickups();
 
     console.log("Seeding completed successfully".green.bold);
 

@@ -7,7 +7,8 @@ const asyncHandler = require('../middlewares/asyncHandler');
 // @route     GET /api/roles
 // @access    Private
 exports.getRoles = asyncHandler(async (req, res) => {
-  const roles = await Role.find();
+  // Get all roles, sorted by name
+  const roles = await Role.find().sort('namaRole');
   
   res.status(200).json({
     success: true,

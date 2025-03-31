@@ -1,9 +1,15 @@
-// routes/roleRoutes.js
+// routes/roleRoutes.js (baru, jika belum ada)
 const express = require('express');
-const { getRoles, getRole, createRole, updateRole, deleteRole } = require('../controllers/roleController');
+const {
+  getRoles,
+  getRole,
+  createRole,
+  updateRole,
+  deleteRole
+} = require('../controllers/roleController');
 const { protect, authorize } = require('../middlewares/auth');
 const { validateObjectId, validateBody } = require('../middlewares/validator');
-const { roleSchema } = require('../utils/validators');
+const { roleSchema } = require('../validations/employeeValidation');
 
 const router = express.Router();
 
@@ -29,7 +35,7 @@ router
     updateRole
   )
   .delete(
-    authorize('direktur', 'manajer_admin', 'manajer_sdm'),
+    authorize('direktur'),
     validateObjectId('id'),
     deleteRole
   );

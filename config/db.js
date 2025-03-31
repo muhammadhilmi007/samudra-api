@@ -1,19 +1,29 @@
+// config/db.js
 const mongoose = require('mongoose');
-const colors = require('colors'); // Make sure colors package is installed
+const config = require('./config');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
+    const conn = await mongoose.connect(process.env.MONGO_URI || config.mongoURI, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
     });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`.cyan.underline);
+    return conn;
   } catch (error) {
-    console.error(`Error: ${error.message}`.red);
+    console.error(`Error connecting to MongoDB: ${error.message}`.red.bold);
     process.exit(1);
   }
 };
 
-// Export as an object with connectDB property to match the destructuring in server.js
-module.exports = { connectDB };
+const disconnectDB = async () => {
+  try {
+    await mongoose.disconnect();
+    console.log('MongoDB disconnected'.yellow);
+  } catch (error) {
+    console.error(`Error disconnecting from MongoDB: ${error.message}`.red.bold);
+  }
+};
+
+module.exports = { connectDB, disconnectDB };
