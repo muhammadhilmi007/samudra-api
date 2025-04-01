@@ -7,7 +7,9 @@ const {
   updatePickupRequest,
   updatePickupRequestStatus,
   getPendingPickupRequests,
-  deletePickupRequest
+  deletePickupRequest,
+  linkToPickup,
+  getPickupRequestsByCustomer
 } = require('../controllers/pickupRequestController');
 const { protect, authorize } = require('../middlewares/auth');
 
@@ -18,11 +20,16 @@ router.use(protect);
 
 // Special routes
 router.get('/pending', getPendingPickupRequests);
+router.get('/customer/:customerId', getPickupRequestsByCustomer);
 
-// Status update route
+// Status update and link routes
 router
   .route('/:id/status')
   .put(authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), updatePickupRequestStatus);
+
+router
+  .route('/:id/link')
+  .put(authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), linkToPickup);
 
 // CRUD routes
 router

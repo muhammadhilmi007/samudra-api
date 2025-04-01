@@ -3,13 +3,15 @@ const PickupRequest = require('../models/PickupRequest');
 const Customer = require('../models/Customer');
 const { paginationResult } = require('../utils/helpers');
 const config = require('../config/config');
+const ErrorResponse = require('../utils/errorResponse');
+const mongoose = require('mongoose');
 
 // @desc      Get all pickup requests
 // @route     GET /api/pickup-requests
 // @access    Private
-exports.getPickupRequests = async (req, res) => {
+exports.getPickupRequests = async (req, res, next) => {
   try {
-    // Filter based on query
+    // Build filter based on query
     const filter = {};
     
     if (req.query.cabangId) {
@@ -40,6 +42,7 @@ exports.getPickupRequests = async (req, res) => {
       
       // Search in multiple fields
       filter.$or = [
+        { noRequest: { $regex: searchRegex } },
         { alamatPengambilan: { $regex: searchRegex } },
         { tujuan: { $regex: searchRegex } }
       ];
@@ -54,29 +57,39 @@ exports.getPickupRequests = async (req, res) => {
     if (req.query.startDate && req.query.endDate) {
       filter.tanggal = {
         $gte: new Date(req.query.startDate),
-        $lte: new Date(req.query.endDate)
+        $lte: new Date(req.query.endDate + 'T23:59:59.999Z')
       };
     } else if (req.query.startDate) {
       filter.tanggal = { $gte: new Date(req.query.startDate) };
     } else if (req.query.endDate) {
-      filter.tanggal = { $lte: new Date(req.query.endDate) };
+      filter.tanggal = { $lte: new Date(req.query.endDate + 'T23:59:59.999Z') };
     }
     
     // Pagination
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const startIndex = (page - 1) * limit;
+    
+    // Get total count
     const total = await PickupRequest.countDocuments(filter);
     
+    // Calculate pagination
     const pagination = paginationResult(page, limit, total);
     
+    // Sorting
+    const sortField = req.query.sortField || 'createdAt';
+    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+    const sort = { [sortField]: sortOrder };
+    
+    // Execute query
     const pickupRequests = await PickupRequest.find(filter)
       .populate('pengirimId', 'nama alamat telepon')
       .populate('userId', 'nama')
       .populate('cabangId', 'namaCabang')
+      .populate('pickupId', 'noPengambilan')
       .skip(startIndex)
       .limit(limit)
-      .sort('-createdAt');
+      .sort(sort);
     
     res.status(200).json({
       success: true,
@@ -86,29 +99,23 @@ exports.getPickupRequests = async (req, res) => {
       data: pickupRequests
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mendapatkan data request pengambilan',
-      error: error.message
-    });
+    next(new ErrorResponse(`Gagal mendapatkan data request pengambilan: ${error.message}`, 500));
   }
 };
 
 // @desc      Get single pickup request
 // @route     GET /api/pickup-requests/:id
 // @access    Private
-exports.getPickupRequest = async (req, res) => {
+exports.getPickupRequest = async (req, res, next) => {
   try {
     const pickupRequest = await PickupRequest.findById(req.params.id)
-      .populate('pengirimId', 'nama alamat telepon')
+      .populate('pengirimId', 'nama alamat telepon email kota provinsi kelurahan kecamatan')
       .populate('userId', 'nama')
-      .populate('cabangId', 'namaCabang');
+      .populate('cabangId', 'namaCabang')
+      .populate('pickupId', 'noPengambilan waktuBerangkat waktuPulang');
     
     if (!pickupRequest) {
-      return res.status(404).json({
-        success: false,
-        message: 'Request pengambilan tidak ditemukan'
-      });
+      return next(new ErrorResponse('Request pengambilan tidak ditemukan', 404));
     }
     
     res.status(200).json({
@@ -116,27 +123,20 @@ exports.getPickupRequest = async (req, res) => {
       data: pickupRequest
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mendapatkan data request pengambilan',
-      error: error.message
-    });
+    next(new ErrorResponse(`Gagal mendapatkan data request pengambilan: ${error.message}`, 500));
   }
 };
 
 // @desc      Create new pickup request
 // @route     POST /api/pickup-requests
 // @access    Private
-exports.createPickupRequest = async (req, res) => {
+exports.createPickupRequest = async (req, res, next) => {
   try {
     // Validate customer exists
     if (req.body.pengirimId) {
       const customer = await Customer.findById(req.body.pengirimId);
       if (!customer) {
-        return res.status(404).json({
-          success: false,
-          message: 'Pengirim tidak ditemukan'
-        });
+        return next(new ErrorResponse('Pengirim tidak ditemukan', 404));
       }
     }
     
@@ -153,9 +153,6 @@ exports.createPickupRequest = async (req, res) => {
       req.body.tanggal = new Date();
     }
     
-    // Set default status
-    req.body.status = 'PENDING';
-    
     // Create new pickup request
     const pickupRequest = await PickupRequest.create(req.body);
     
@@ -170,34 +167,24 @@ exports.createPickupRequest = async (req, res) => {
       data: populatedPickupRequest
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Gagal membuat request pengambilan baru',
-      error: error.message
-    });
+    next(new ErrorResponse(`Gagal membuat request pengambilan baru: ${error.message}`, 500));
   }
 };
 
 // @desc      Update pickup request
 // @route     PUT /api/pickup-requests/:id
 // @access    Private
-exports.updatePickupRequest = async (req, res) => {
+exports.updatePickupRequest = async (req, res, next) => {
   try {
     const pickupRequest = await PickupRequest.findById(req.params.id);
     
     if (!pickupRequest) {
-      return res.status(404).json({
-        success: false,
-        message: 'Request pengambilan tidak ditemukan'
-      });
+      return next(new ErrorResponse('Request pengambilan tidak ditemukan', 404));
     }
     
     // Check if request is already finished
     if (pickupRequest.status === 'FINISH') {
-      return res.status(400).json({
-        success: false,
-        message: 'Request pengambilan yang sudah selesai tidak dapat diubah'
-      });
+      return next(new ErrorResponse('Request pengambilan yang sudah selesai tidak dapat diubah', 400));
     }
     
     // Update pickup request
@@ -218,39 +205,39 @@ exports.updatePickupRequest = async (req, res) => {
       data: updatedPickupRequest
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mengupdate request pengambilan',
-      error: error.message
-    });
+    next(new ErrorResponse(`Gagal mengupdate request pengambilan: ${error.message}`, 500));
   }
 };
 
 // @desc      Update pickup request status
 // @route     PUT /api/pickup-requests/:id/status
 // @access    Private
-exports.updatePickupRequestStatus = async (req, res) => {
+exports.updatePickupRequestStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
     
     if (!status) {
-      return res.status(400).json({
-        success: false,
-        message: 'Status harus diisi'
-      });
+      return next(new ErrorResponse('Status harus diisi', 400));
     }
     
     // Validate status
-    if (!['PENDING', 'FINISH'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Status tidak valid'
-      });
+    if (!['PENDING', 'FINISH', 'CANCELLED'].includes(status)) {
+      return next(new ErrorResponse('Status tidak valid', 400));
+    }
+    
+    // Optional notes for status change
+    const updateData = { 
+      status,
+      updatedAt: new Date()
+    };
+    
+    if (req.body.notes) {
+      updateData.notes = req.body.notes;
     }
     
     const pickupRequest = await PickupRequest.findByIdAndUpdate(
       req.params.id,
-      { status },
+      updateData,
       {
         new: true,
         runValidators: true
@@ -261,10 +248,7 @@ exports.updatePickupRequestStatus = async (req, res) => {
       .populate('cabangId', 'namaCabang');
     
     if (!pickupRequest) {
-      return res.status(404).json({
-        success: false,
-        message: 'Request pengambilan tidak ditemukan'
-      });
+      return next(new ErrorResponse('Request pengambilan tidak ditemukan', 404));
     }
     
     res.status(200).json({
@@ -272,18 +256,14 @@ exports.updatePickupRequestStatus = async (req, res) => {
       data: pickupRequest
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mengupdate status request pengambilan',
-      error: error.message
-    });
+    next(new ErrorResponse(`Gagal mengupdate status request pengambilan: ${error.message}`, 500));
   }
 };
 
 // @desc      Get pending pickup requests
 // @route     GET /api/pickup-requests/pending
 // @access    Private
-exports.getPendingPickupRequests = async (req, res) => {
+exports.getPendingPickupRequests = async (req, res, next) => {
   try {
     // Filter for pickup requests with status PENDING
     const filter = {
@@ -300,59 +280,152 @@ exports.getPendingPickupRequests = async (req, res) => {
       filter.cabangId = req.query.cabangId;
     }
     
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const startIndex = (page - 1) * limit;
+    
+    // Get total count
+    const total = await PickupRequest.countDocuments(filter);
+    
+    // Calculate pagination
+    const pagination = paginationResult(page, limit, total);
+    
     const pendingRequests = await PickupRequest.find(filter)
       .populate('pengirimId', 'nama alamat telepon')
       .populate('userId', 'nama')
       .populate('cabangId', 'namaCabang')
+      .skip(startIndex)
+      .limit(limit)
       .sort('-createdAt');
     
     res.status(200).json({
       success: true,
       count: pendingRequests.length,
+      pagination: pagination.pagination,
+      total,
       data: pendingRequests
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Gagal mendapatkan data request pengambilan pending',
-      error: error.message
-    });
+    next(new ErrorResponse(`Gagal mendapatkan data request pengambilan pending: ${error.message}`, 500));
   }
 };
 
 // @desc      Delete pickup request
 // @route     DELETE /api/pickup-requests/:id
 // @access    Private
-exports.deletePickupRequest = async (req, res) => {
+exports.deletePickupRequest = async (req, res, next) => {
   try {
     const pickupRequest = await PickupRequest.findById(req.params.id);
     
     if (!pickupRequest) {
-      return res.status(404).json({
-        success: false,
-        message: 'Request pengambilan tidak ditemukan'
-      });
+      return next(new ErrorResponse('Request pengambilan tidak ditemukan', 404));
     }
     
     // Check if request is already finished
     if (pickupRequest.status === 'FINISH') {
-      return res.status(400).json({
-        success: false,
-        message: 'Request pengambilan yang sudah selesai tidak dapat dihapus'
-      });
+      return next(new ErrorResponse('Request pengambilan yang sudah selesai tidak dapat dihapus', 400));
     }
     
     await pickupRequest.deleteOne();
     
     res.status(200).json({
       success: true,
-      message: 'Request pengambilan berhasil dihapus'
+      message: 'Request pengambilan berhasil dihapus',
+      data: {}
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Gagal menghapus request pengambilan',
-      error: error.message
+    next(new ErrorResponse(`Gagal menghapus request pengambilan: ${error.message}`, 500));
+  }
+};
+
+// @desc      Link pickup request to pickup
+// @route     PUT /api/pickup-requests/:id/link
+// @access    Private
+exports.linkToPickup = async (req, res, next) => {
+  try {
+    const { pickupId } = req.body;
+    
+    if (!pickupId) {
+      return next(new ErrorResponse('ID Pengambilan harus diisi', 400));
+    }
+    
+    // Update pickup request
+    const pickupRequest = await PickupRequest.findByIdAndUpdate(
+      req.params.id,
+      { 
+        pickupId,
+        status: 'FINISH',
+        updatedAt: new Date()
+      },
+      {
+        new: true,
+        runValidators: true
+      }
+    )
+      .populate('pengirimId', 'nama alamat telepon')
+      .populate('userId', 'nama')
+      .populate('cabangId', 'namaCabang')
+      .populate('pickupId', 'noPengambilan');
+    
+    if (!pickupRequest) {
+      return next(new ErrorResponse('Request pengambilan tidak ditemukan', 404));
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: pickupRequest
     });
+  } catch (error) {
+    next(new ErrorResponse(`Gagal mengaitkan request pengambilan dengan pengambilan: ${error.message}`, 500));
+  }
+};
+
+// @desc      Get pickup requests by customer
+// @route     GET /api/pickup-requests/customer/:customerId
+// @access    Private
+exports.getPickupRequestsByCustomer = async (req, res, next) => {
+  try {
+    const customerId = req.params.customerId;
+    
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      return next(new ErrorResponse('ID Pelanggan tidak valid', 400));
+    }
+    
+    // Build filter
+    const filter = {
+      pengirimId: customerId
+    };
+    
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const startIndex = (page - 1) * limit;
+    
+    // Get total count
+    const total = await PickupRequest.countDocuments(filter);
+    
+    // Calculate pagination
+    const pagination = paginationResult(page, limit, total);
+    
+    // Execute query
+    const pickupRequests = await PickupRequest.find(filter)
+      .populate('pengirimId', 'nama alamat telepon')
+      .populate('userId', 'nama')
+      .populate('cabangId', 'namaCabang')
+      .populate('pickupId', 'noPengambilan')
+      .skip(startIndex)
+      .limit(limit)
+      .sort('-createdAt');
+    
+    res.status(200).json({
+      success: true,
+      count: pickupRequests.length,
+      pagination: pagination.pagination,
+      total,
+      data: pickupRequests
+    });
+  } catch (error) {
+    next(new ErrorResponse(`Gagal mendapatkan data request pengambilan pelanggan: ${error.message}`, 500));
   }
 };
