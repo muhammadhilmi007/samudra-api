@@ -6,20 +6,8 @@ const DivisionSchema = new mongoose.Schema({
     required: [true, 'Nama divisi harus diisi'],
     unique: true,
     trim: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
   }
+}, {
+  timestamps: true // Use mongoose timestamps
 });
-
-// Update updatedAt pada update
-DivisionSchema.pre('findOneAndUpdate', function() {
-  this.set({ updatedAt: Date.now() });
-});
-
 module.exports = mongoose.model('Division', DivisionSchema);

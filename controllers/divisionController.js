@@ -6,15 +6,9 @@ const Division = require('../models/Division');
 exports.getDivisions = async (req, res) => {
   try {
     const divisions = await Division.find();
-    
-    res.status(200).json({
-      success: true,
-      count: divisions.length,
-      data: divisions
-    });
+    res.status(200).json(divisions);
   } catch (error) {
     res.status(500).json({
-      success: false,
       message: 'Gagal mendapatkan data divisi',
       error: error.message
     });
@@ -30,18 +24,13 @@ exports.getDivision = async (req, res) => {
     
     if (!division) {
       return res.status(404).json({
-        success: false,
         message: 'Divisi tidak ditemukan'
       });
     }
     
-    res.status(200).json({
-      success: true,
-      data: division
-    });
+    res.status(200).json(division);
   } catch (error) {
     res.status(500).json({
-      success: false,
       message: 'Gagal mendapatkan data divisi',
       error: error.message
     });

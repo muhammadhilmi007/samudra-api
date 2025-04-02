@@ -18,6 +18,7 @@ router
   .route('/')
   .get(getDivisions)
   .post(
+    protect,
     authorize('direktur', 'manajer_admin'),
     validateBody(divisionSchema),
     createDivision

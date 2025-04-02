@@ -9,7 +9,6 @@ const defaultSchema = z.any();
 
 const validateBody = (schema = defaultSchema) => {
   return (req, res, next) => {
-
     // Debug information
     console.log(`[DEBUG] Validation route: ${req.method} ${req.originalUrl}`);
     console.log(`[DEBUG] Schema defined: ${!!schema}`);
@@ -40,7 +39,7 @@ const validateBody = (schema = defaultSchema) => {
       
       // If success, update req.body with validated data
       req.body = result.data;
-      next();
+      next(); // Fixed: Call next() to proceed
     } catch (error) {
       console.error('Validation error:', error);
       res.status(400).json({
@@ -82,7 +81,7 @@ const validateQuery = (schema) => {
         });
       }
       
-      next();
+      next(); // Fixed: Call next() to proceed
     } catch (error) {
       res.status(400).json({
         success: false,
@@ -123,7 +122,7 @@ const validateParams = (schema) => {
         });
       }
       
-      next();
+      next(); // Fixed: Call next() to proceed
     } catch (error) {
       res.status(400).json({
         success: false,
@@ -148,7 +147,7 @@ const validateObjectId = (paramName = 'id') => {
       });
     }
     
-    next();
+    next(); // Fixed: Call next() to proceed
   };
 };
 

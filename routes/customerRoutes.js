@@ -25,12 +25,19 @@ router.use(protect);
 // Public routes (for authenticated users)
 router.get('/senders', getSenders);
 router.get('/recipients', getRecipients);
+router.get('/customers/senders', getSenders);
+router.get('/customers/recipients', getRecipients);
+router.get('/customers/by-branch/:branchId', getCustomersByBranch);
+router.get('/customers/:id/stts', getCustomerSTTs);
+router.get('/customers/:id/collections', getCustomerCollections);
+router.get('/customers/:id/pickups', getCustomerPickups);
 router.get('/by-branch/:branchId', validateObjectId('branchId'), getCustomersByBranch);
 
 // Customer related data routes
 router.get('/:customerId/stts', validateObjectId('customerId'), getCustomerSTTs);
 router.get('/:customerId/collections', validateObjectId('customerId'), getCustomerCollections);
 router.get('/:customerId/pickups', validateObjectId('customerId'), getCustomerPickups);
+
 
 // CRUD routes
 router
