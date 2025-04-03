@@ -26,7 +26,7 @@ router
   .route('/')
   .get(getSTTs)
   .post(
-    authorize('administrator','direktur','staff_penjualan', 'kepala_cabang', 'staff_admin'),
+    authorize('administrator', 'direktur', 'staff_penjualan', 'kepala_cabang', 'staff_admin'),
     // validateBody(sttSchema),
     createSTT
   );
@@ -36,7 +36,7 @@ router
   .get(validateObjectId('id'), getSTT)
   .put(
     validateObjectId('id'),
-    authorize('administrator','direktur','staff_penjualan', 'kepala_cabang', 'staff_admin'),
+    authorize('administrator', 'direktur', 'staff_penjualan', 'kepala_cabang', 'staff_admin'),
     // validateBody(sttSchema),
     updateSTT
   );
@@ -45,7 +45,7 @@ router
   .route('/:id/status')
   .put(
     validateObjectId('id'),
-    authorize('administrator','direktur','staff_penjualan', 'kepala_cabang', 'staff_admin', 'checker'),
+    authorize('administrator', 'direktur', 'staff_penjualan', 'kepala_cabang', 'staff_admin', 'checker'),
     // validateBody(statusUpdateSchema),
     updateSTTStatus
   );
