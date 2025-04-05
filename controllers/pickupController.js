@@ -5,6 +5,16 @@ const Customer = require("../models/Customer");
 const STT = require("../models/STT");
 const { paginationResult } = require("../utils/helpers");
 
+const populateFields = [
+  { path: "pengirimId", select: "nama alamat telepon" },
+  { path: "supirId", select: "nama" },
+  { path: "kenekId", select: "nama" },
+  { path: "kendaraanId", select: "noPolisi namaKendaraan" },
+  { path: "sttIds", select: "noSTT status createdAt" },
+  { path: "userId", select: "nama" },
+  { path: "cabangId", select: "namaCabang" },
+];
+
 // @desc      Get all pickups
 // @route     GET /api/pickups
 // @access    Private
@@ -34,29 +44,29 @@ exports.getPickups = async (req, res) => {
     if (req.query.kendaraanId) {
       filter.kendaraanId = req.query.kendaraanId;
     }
-    
+
     if (req.query.status) {
       filter.status = req.query.status;
     }
-    
+
     // Search by text
     if (req.query.search) {
-      const searchRegex = new RegExp(req.query.search, 'i');
-      
+      const searchRegex = new RegExp(req.query.search, "i");
+
       // Get customer IDs that match the search
       const customers = await Customer.find({
-        nama: { $regex: searchRegex }
-      }).select('_id');
-      
-      const customerIds = customers.map(customer => customer._id);
-      
+        nama: { $regex: searchRegex },
+      }).select("_id");
+
+      const customerIds = customers.map((customer) => customer._id);
+
       // Search in multiple fields
       filter.$or = [
         { noPengambilan: { $regex: searchRegex } },
         { alamatPengambilan: { $regex: searchRegex } },
-        { tujuan: { $regex: searchRegex } }
+        { tujuan: { $regex: searchRegex } },
       ];
-      
+
       // Add customer IDs to the search
       if (customerIds.length > 0) {
         filter.$or.push({ pengirimId: { $in: customerIds } });
@@ -84,13 +94,7 @@ exports.getPickups = async (req, res) => {
     const pagination = paginationResult(page, limit, total);
 
     const pickups = await Pickup.find(filter)
-      .populate("pengirimId", "nama alamat telepon")
-      .populate("supirId", "nama")
-      .populate("kenekId", "nama")
-      .populate("kendaraanId", "noPolisi namaKendaraan")
-      .populate("sttIds", "noSTT")
-      .populate("userId", "nama")
-      .populate("cabangId", "namaCabang")
+      .populate(populateFields)
       .skip(startIndex)
       .limit(limit)
       .sort("-createdAt");
@@ -174,7 +178,7 @@ exports.createPickup = async (req, res) => {
         message: "Kendaraan harus diisi",
       });
     }
-    
+
     if (!req.body.alamatPengambilan) {
       return res.status(400).json({
         success: false,
@@ -202,7 +206,7 @@ exports.createPickup = async (req, res) => {
 
     // Set userId and cabangId from logged in user
     req.body.userId = req.user.id;
-    
+
     // Use branch from body if provided, otherwise use user's branch
     if (!req.body.cabangId) {
       req.body.cabangId = req.user.cabangId;
@@ -212,9 +216,9 @@ exports.createPickup = async (req, res) => {
     if (!req.body.tanggal) {
       req.body.tanggal = new Date();
     }
-    
+
     // Set default status
-    req.body.status = 'PENDING';
+    req.body.status = "PENDING";
 
     // Create pickup
     const pickup = await Pickup.create(req.body);
