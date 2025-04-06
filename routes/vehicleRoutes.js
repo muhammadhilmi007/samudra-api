@@ -1,4 +1,6 @@
+// routes/vehicleRoutes.js
 const express = require('express');
+const multer = require('multer');
 const {
   getVehicles,
   getVehicle,
@@ -7,7 +9,9 @@ const {
   deleteVehicle,
   getVehiclesByBranch,
   getTrucks,
-  getDeliveryVehicles
+  getDeliveryVehicles,
+  uploadVehiclePhoto, // Add this controller
+  uploadVehicleDocument // Add this controller
 } = require('../controllers/vehicleController');
 const { protect, authorize } = require('../middlewares/auth');
 const { validateBody, validateObjectId } = require('../middlewares/validator');
@@ -21,6 +25,10 @@ router.use(protect);
 router.get('/trucks', getTrucks);
 router.get('/delivery', getDeliveryVehicles);
 router.get('/by-branch/:branchId', validateObjectId('branchId'), getVehiclesByBranch);
+
+// File upload routes
+router.post('/:id/upload-photo', validateObjectId(), uploadVehiclePhoto);
+router.post('/:id/upload-document', validateObjectId(), uploadVehicleDocument);
 
 // CRUD routes
 router

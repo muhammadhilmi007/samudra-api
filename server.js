@@ -29,6 +29,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const mobileRoutes = require('./routes/mobileRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
+const vehicleQueueRoutes = require('./routes/vehicleQueueRoutes');
 
 // Import middlewares and utilities
 const errorHandler = require('./middlewares/errorHandler');
@@ -81,6 +82,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/mobile', mobileRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/vehicle-queues', vehicleQueueRoutes);
 
 // Base route for API
 app.get('/api', (req, res) => {
