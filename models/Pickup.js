@@ -1,4 +1,5 @@
-// models/Pickup.js
+// models/Pickup.js - Improve the pickup model
+
 const mongoose = require('mongoose');
 
 const PickupSchema = new mongoose.Schema({
@@ -67,10 +68,17 @@ const PickupSchema = new mongoose.Schema({
     ref: 'Branch',
     required: [true, 'Cabang harus diisi']
   },
+  requestId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PickupRequest'
+  },
   status: {
     type: String,
     enum: ['PENDING', 'BERANGKAT', 'SELESAI', 'CANCELLED'],
     default: 'PENDING'
+  },
+  notes: {
+    type: String
   },
   createdAt: {
     type: Date,
@@ -123,6 +131,20 @@ PickupSchema.pre('save', async function(next) {
       
       // Set pickup number
       this.noPengambilan = `PKP-${branchCode}-${dateStr}-${counterStr}`;
+
+      // If this pickup is created from a request, update the request
+      if (this.requestId) {
+        try {
+          const PickupRequest = mongoose.model('PickupRequest');
+          await PickupRequest.findByIdAndUpdate(
+            this.requestId,
+            { pickupId: this._id }
+          );
+        } catch (err) {
+          console.error('Error updating pickup request:', err);
+          // Continue even if updating request fails
+        }
+      }
       
       next();
     } catch (error) {
