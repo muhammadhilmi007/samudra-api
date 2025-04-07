@@ -136,34 +136,50 @@ exports.createCustomer = async (req, res) => {
 // @access    Private
 exports.updateCustomer = async (req, res) => {
   try {
-    // Normalisasi tipe customer ke lowercase
-    if (req.body.tipe) {
-      req.body.tipe = req.body.tipe.toLowerCase();
+    console.log("Updating customer with ID:", req.params.id);
+    console.log("Update data received:", req.body);
+    
+    // Create update data object
+    const updateData = { ...req.body };
+    
+    // Ensure cabangId is properly handled
+    if (updateData.cabangId) {
+      console.log("Original cabangId:", updateData.cabangId);
+      // Make sure it's a valid ObjectId string
+      updateData.cabangId = updateData.cabangId.toString();
+      console.log("Formatted cabangId for update:", updateData.cabangId);
     }
-
-    const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    })
-      .populate("cabangId", "namaCabang")
-      .populate("createdBy", "nama");
-
+    
+    // Find customer by ID and update
+    const customer = await Customer.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      {
+        new: true,
+        runValidators: true
+      }
+    ).populate("cabangId", "namaCabang");
+    
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Pelanggan tidak ditemukan",
+        message: "Pelanggan tidak ditemukan"
       });
     }
-
+    
+    console.log("Updated customer:", customer);
+    
     res.status(200).json({
       success: true,
-      data: customer,
+      message: "Pelanggan berhasil diperbarui",
+      data: customer
     });
   } catch (error) {
+    console.error("Error updating customer:", error);
     res.status(500).json({
       success: false,
-      message: "Gagal mengupdate pelanggan",
-      error: error.message,
+      message: "Gagal memperbarui pelanggan",
+      error: error.message
     });
   }
 };

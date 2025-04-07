@@ -1,6 +1,5 @@
 // routes/vehicleRoutes.js
 const express = require('express');
-const multer = require('multer');
 const {
   getVehicles,
   getVehicle,
@@ -10,11 +9,15 @@ const {
   getVehiclesByBranch,
   getTrucks,
   getDeliveryVehicles,
-  uploadVehiclePhoto, // Add this controller
-  uploadVehicleDocument // Add this controller
+  uploadVehiclePhoto,
+  uploadVehicleDocument,
+  getAvailableVehiclesForPickup,
+  getAvailableVehiclesForLoading,
+  getMobileVehicles
 } = require('../controllers/vehicleController');
 const { protect, authorize } = require('../middlewares/auth');
-const { validateBody, validateObjectId } = require('../middlewares/validator');
+const { validateObjectId } = require('../middlewares/validator');
+const asyncHandler = require('../middlewares/asyncHandler');
 
 const router = express.Router();
 
@@ -22,24 +25,38 @@ const router = express.Router();
 router.use(protect);
 
 // Special routes
-router.get('/trucks', getTrucks);
-router.get('/delivery', getDeliveryVehicles);
-router.get('/by-branch/:branchId', validateObjectId('branchId'), getVehiclesByBranch);
+router.get('/trucks', asyncHandler(getTrucks));
+router.get('/delivery', asyncHandler(getDeliveryVehicles));
+router.get('/by-branch/:branchId', validateObjectId('branchId'), asyncHandler(getVehiclesByBranch));
+router.get('/available-for-pickup', asyncHandler(getAvailableVehiclesForPickup));
+router.get('/available-for-loading', asyncHandler(getAvailableVehiclesForLoading));
+router.get('/mobile', asyncHandler(getMobileVehicles));
 
 // File upload routes
-router.post('/:id/upload-photo', validateObjectId(), uploadVehiclePhoto);
-router.post('/:id/upload-document', validateObjectId(), uploadVehicleDocument);
+router.post('/:id/upload-photo', validateObjectId(), asyncHandler(uploadVehiclePhoto));
+router.post('/:id/upload-document', validateObjectId(), asyncHandler(uploadVehicleDocument));
 
 // CRUD routes
 router
   .route('/')
-  .get(getVehicles)
-  .post(authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang'), createVehicle);
+  .get(asyncHandler(getVehicles))
+  .post(
+    authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang'),
+    asyncHandler(createVehicle)
+  );
 
 router
   .route('/:id')
-  .get(validateObjectId(), getVehicle)
-  .put(validateObjectId(), authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang'), updateVehicle)
-  .delete(validateObjectId(), authorize('direktur', 'manajer_operasional', 'kepala_cabang'), deleteVehicle);
+  .get(validateObjectId(), asyncHandler(getVehicle))
+  .put(
+    validateObjectId(),
+    authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang'),
+    asyncHandler(updateVehicle)
+  )
+  .delete(
+    validateObjectId(),
+    authorize('direktur', 'manajer_operasional', 'kepala_cabang'),
+    asyncHandler(deleteVehicle)
+  );
 
 module.exports = router;
