@@ -7,6 +7,7 @@ const ErrorResponse = require('../utils/errorResponse');
 const path = require('path');
 const fs = require('fs');
 const config = require('../config/config');
+const bcrypt = require('bcryptjs');
 
 /**
  * @desc      Get all employees with pagination and filtering
@@ -103,19 +104,10 @@ exports.getEmployeeById = asyncHandler(async (req, res) => {
     .select('-password');
   
   if (!employee) {
-    return next(new ErrorResponse('Pegawai tidak ditemukan', 404));
-  }
-  
-  // Check authorization: only directors, HR managers, admin managers, branch heads can access other branch employees
-  const isAuthorized = 
-    req.user.role === 'direktur' || 
-    req.user.role === 'manajer_admin' || 
-    req.user.role === 'manajer_sdm' || 
-    (req.user.role === 'kepala_cabang' && employee.cabangId.toString() === req.user.cabangId.toString()) ||
-    employee._id.toString() === req.user._id.toString(); // Users can access their own data
-  
-  if (!isAuthorized) {
-    return next(new ErrorResponse('Tidak diizinkan untuk mengakses data pegawai cabang lain', 403));
+    return res.status(404).json({
+      success: false,
+      message: 'Pegawai tidak ditemukan'
+    });
   }
   
   res.status(200).json({
@@ -125,36 +117,258 @@ exports.getEmployeeById = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc      Create new employee
+ * @route     POST /api/employees
+ * @access    Private (Admin, HR Manager, Branch Manager)
+ */
+exports.createEmployee = asyncHandler(async (req, res) => {
+  // Check if username already exists
+  const existingUser = await User.findOne({ username: req.body.username });
+  if (existingUser) {
+    return res.status(400).json({
+      success: false,
+      message: 'Username sudah digunakan'
+    });
+  }
+  
+  // Check if email already exists (if provided)
+  if (req.body.email && req.body.email.trim() !== '') {
+    const existingEmail = await User.findOne({ email: req.body.email });
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email sudah digunakan'
+      });
+    }
+  }
+  
+  // Get role information
+  const role = await Role.findById(req.body.roleId);
+  if (!role) {
+    return res.status(400).json({
+      success: false,
+      message: 'Role tidak ditemukan'
+    });
+  }
+  
+  // Add role code to the employee data
+  req.body.role = role.kodeRole;
+  
+  // Handle file uploads
+  if (req.files) {
+    // Profile picture
+    if (req.files.fotoProfil) {
+      req.body.fotoProfil = req.files.fotoProfil[0].filename;
+    }
+    
+    // KTP document
+    if (req.files['dokumen.ktp']) {
+      if (!req.body.dokumen) req.body.dokumen = {};
+      req.body.dokumen.ktp = req.files['dokumen.ktp'][0].filename;
+    }
+    
+    // NPWP document
+    if (req.files['dokumen.npwp']) {
+      if (!req.body.dokumen) req.body.dokumen = {};
+      req.body.dokumen.npwp = req.files['dokumen.npwp'][0].filename;
+    }
+  }
+  
+  // Create employee
+  const employee = await User.create(req.body);
+  
+  res.status(201).json({
+    success: true,
+    message: 'Pegawai berhasil dibuat',
+    data: employee
+  });
+});
+
+/**
+ * @desc      Update employee
+ * @route     PUT /api/employees/:id
+ * @access    Private (Admin, HR Manager, Branch Manager)
+ */
+exports.updateEmployee = asyncHandler(async (req, res) => {
+  let employee = await User.findById(req.params.id);
+  
+  if (!employee) {
+    return res.status(404).json({
+      success: false,
+      message: 'Pegawai tidak ditemukan'
+    });
+  }
+  
+  // Check if username already exists (if changed)
+  if (req.body.username && req.body.username !== employee.username) {
+    const existingUser = await User.findOne({ username: req.body.username });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username sudah digunakan'
+      });
+    }
+  }
+  
+  // Check if email already exists (if changed and provided)
+  if (req.body.email && req.body.email.trim() !== '' && req.body.email !== employee.email) {
+    const existingEmail = await User.findOne({ email: req.body.email });
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email sudah digunakan'
+      });
+    }
+  }
+  
+  // If roleId is changed, update role code
+  if (req.body.roleId && req.body.roleId.toString() !== employee.roleId.toString()) {
+    const role = await Role.findById(req.body.roleId);
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role tidak ditemukan'
+      });
+    }
+    req.body.role = role.kodeRole;
+  }
+  
+  // Handle file uploads
+  if (req.files) {
+    // Profile picture
+    if (req.files.fotoProfil) {
+      // Delete old profile picture if not default
+      if (employee.fotoProfil && employee.fotoProfil !== 'default.jpg') {
+        const oldPath = path.join(__dirname, '../uploads', employee.fotoProfil);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+      req.body.fotoProfil = req.files.fotoProfil[0].filename;
+    }
+    
+    // KTP document
+    if (req.files['dokumen.ktp']) {
+      // Delete old KTP document if exists
+      if (employee.dokumen && employee.dokumen.ktp) {
+        const oldPath = path.join(__dirname, '../uploads', employee.dokumen.ktp);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+      if (!req.body.dokumen) req.body.dokumen = {};
+      req.body.dokumen.ktp = req.files['dokumen.ktp'][0].filename;
+    }
+    
+    // NPWP document
+    if (req.files['dokumen.npwp']) {
+      // Delete old NPWP document if exists
+      if (employee.dokumen && employee.dokumen.npwp) {
+        const oldPath = path.join(__dirname, '../uploads', employee.dokumen.npwp);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+      if (!req.body.dokumen) req.body.dokumen = {};
+      req.body.dokumen.npwp = req.files['dokumen.npwp'][0].filename;
+    }
+  }
+  
+  // Handle password update
+  if (req.body.password && req.body.password.trim() !== '') {
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    req.body.password = await bcrypt.hash(req.body.password, salt);
+  } else {
+    // Remove password field if empty
+    delete req.body.password;
+  }
+  
+  // Update employee
+  employee = await User.findByIdAndUpdate(
+    req.params.id,
+    { $set: req.body },
+    { new: true, runValidators: true }
+  ).select('-password');
+  
+  res.status(200).json({
+    success: true,
+    message: 'Pegawai berhasil diperbarui',
+    data: employee
+  });
+});
+
+/**
+ * @desc      Delete employee
+ * @route     DELETE /api/employees/:id
+ * @access    Private (Admin, HR Manager)
+ */
+exports.deleteEmployee = asyncHandler(async (req, res) => {
+  const employee = await User.findById(req.params.id);
+  
+  if (!employee) {
+    return res.status(404).json({
+      success: false,
+      message: 'Pegawai tidak ditemukan'
+    });
+  }
+  
+  // Delete profile picture if not default
+  if (employee.fotoProfil && employee.fotoProfil !== 'default.jpg') {
+    const picturePath = path.join(__dirname, '../uploads', employee.fotoProfil);
+    if (fs.existsSync(picturePath)) {
+      fs.unlinkSync(picturePath);
+    }
+  }
+  
+  // Delete documents if exist
+  if (employee.dokumen) {
+    if (employee.dokumen.ktp) {
+      const ktpPath = path.join(__dirname, '../uploads', employee.dokumen.ktp);
+      if (fs.existsSync(ktpPath)) {
+        fs.unlinkSync(ktpPath);
+      }
+    }
+    
+    if (employee.dokumen.npwp) {
+      const npwpPath = path.join(__dirname, '../uploads', employee.dokumen.npwp);
+      if (fs.existsSync(npwpPath)) {
+        fs.unlinkSync(npwpPath);
+      }
+    }
+    
+    // Delete other documents
+    if (employee.dokumen.lainnya && employee.dokumen.lainnya.length > 0) {
+      employee.dokumen.lainnya.forEach(doc => {
+        const docPath = path.join(__dirname, '../uploads', doc);
+        if (fs.existsSync(docPath)) {
+          fs.unlinkSync(docPath);
+        }
+      });
+    }
+  }
+  
+  // Delete employee
+  await employee.remove();
+  
+  res.status(200).json({
+    success: true,
+    message: 'Pegawai berhasil dihapus',
+    data: {}
+  });
+});
+
+/**
  * @desc      Get employees by branch
  * @route     GET /api/employees/by-branch/:branchId
  * @access    Private
  */
-exports.getEmployeesByBranch = asyncHandler(async (req, res, next) => {
-  // Check if branch exists
-  const branch = await Branch.findById(req.params.branchId);
-  
-  if (!branch) {
-    return next(new ErrorResponse(`Cabang dengan ID ${req.params.branchId} tidak ditemukan`, 404));
-  }
-  
-  // Check authorization: only directors, HR managers, admin managers, or heads of that branch can access
-  const isAuthorized = 
-    req.user.role === 'direktur' || 
-    req.user.role === 'manajer_admin' || 
-    req.user.role === 'manajer_sdm' || 
-    (req.user.role === 'kepala_cabang' && req.params.branchId === req.user.cabangId.toString());
-  
-  if (!isAuthorized) {
-    return next(new ErrorResponse('Tidak diizinkan untuk mengakses data pegawai cabang lain', 403));
-  }
-  
-  const employees = await User.find({
-    cabangId: req.params.branchId
-  })
+exports.getEmployeesByBranch = asyncHandler(async (req, res) => {
+  const employees = await User.find({ cabangId: req.params.branchId })
     .populate('cabangId', 'namaCabang')
     .populate('roleId', 'namaRole permissions')
     .select('-password')
-    .sort({ nama: 1 });
+    .sort({ createdAt: -1 });
   
   res.status(200).json({
     success: true,
@@ -163,348 +377,7 @@ exports.getEmployeesByBranch = asyncHandler(async (req, res, next) => {
   });
 });
 
-/**
- * @desc      Create employee
- * @route     POST /api/employees
- * @access    Private (Directors, HR Managers, Admin Managers, Branch Heads)
- */
-exports.createEmployee = asyncHandler(async (req, res, next) => {
-  // Check authorization for creating employees
-  const isAuthorized = 
-    req.user.role === 'direktur' || 
-    req.user.role === 'manajer_admin' || 
-    req.user.role === 'manajer_sdm' || 
-    req.user.role === 'kepala_cabang';
-  
-  if (!isAuthorized) {
-    return next(new ErrorResponse('Tidak diizinkan untuk membuat pegawai baru', 403));
-  }
-  
-  // For branch heads, restrict to their own branch
-  if (req.user.role === 'kepala_cabang' && req.body.cabangId !== req.user.cabangId.toString()) {
-    return next(new ErrorResponse('Kepala cabang hanya dapat membuat pegawai untuk cabangnya sendiri', 403));
-  }
-  
-  // Check if username or email already exists
-  const existingUser = await User.findOne({
-    $or: [
-      { username: req.body.username },
-      { email: req.body.email && req.body.email !== '' ? req.body.email : null }
-    ]
-  });
-  
-  if (existingUser) {
-    // Delete uploaded files if any
-    if (req.files) {
-      Object.keys(req.files).forEach(key => {
-        const file = req.files[key][0];
-        fs.unlinkSync(file.path);
-      });
-    }
-    
-    return next(new ErrorResponse('Username atau email sudah terdaftar', 400));
-  }
-  
-  // Check if roleId is valid and get the role code
-  const role = await Role.findById(req.body.roleId);
-  if (!role) {
-    return next(new ErrorResponse('Role tidak valid', 400));
-  }
-  
-  // Branch heads can only create staff roles
-  if (req.user.role === 'kepala_cabang' && 
-      !['staff_admin', 'staff_penjualan', 'kasir', 'checker', 'supir'].includes(role.kodeRole)) {
-    return next(new ErrorResponse('Kepala cabang hanya dapat membuat pegawai dengan role staff', 403));
-  }
-  
-  // Add the role code to the employee data
-  const employeeData = { ...req.body, role: role.kodeRole };
-  
-  // Check if cabangId is valid
-  const branch = await Branch.findById(req.body.cabangId);
-  if (!branch) {
-    return next(new ErrorResponse('Cabang tidak valid', 400));
-  }
-  
-  // Process file uploads
-  if (req.files) {
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(__dirname, '..', config.uploadPath);
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    
-    // Handle profile photo
-    if (req.files.fotoProfil) {
-      const profileFile = req.files.fotoProfil[0];
-      employeeData.fotoProfil = `${config.uploadPath}/${profileFile.filename}`;
-    }
-    
-    // Handle KTP document
-    if (req.files['dokumen.ktp']) {
-      if (!employeeData.dokumen) {
-        employeeData.dokumen = {};
-      }
-      const ktpFile = req.files['dokumen.ktp'][0];
-      employeeData.dokumen.ktp = `${config.uploadPath}/${ktpFile.filename}`;
-    }
-    
-    // Handle NPWP document
-    if (req.files['dokumen.npwp']) {
-      if (!employeeData.dokumen) {
-        employeeData.dokumen = {};
-      }
-      const npwpFile = req.files['dokumen.npwp'][0];
-      employeeData.dokumen.npwp = `${config.uploadPath}/${npwpFile.filename}`;
-    }
-  }
-  
-  // Create employee
-  const employee = await User.create(employeeData);
-  
-  // Remove password from response
-  employee.password = undefined;
-  
-  res.status(201).json({
-    success: true,
-    data: employee,
-    message: 'Pegawai berhasil ditambahkan'
-  });
-});
-
-/**
- * @desc      Update employee
- * @route     PUT /api/employees/:id
- * @access    Private (Directors, HR Managers, Admin Managers, Branch Heads, Self)
- */
-exports.updateEmployee = asyncHandler(async (req, res, next) => {
-  let employee = await User.findById(req.params.id);
-  
-  if (!employee) {
-    return next(new ErrorResponse('Pegawai tidak ditemukan', 404));
-  }
-  
-  // Check authorization
-  const isAuthorized = 
-    req.user.role === 'direktur' || 
-    req.user.role === 'manajer_admin' || 
-    req.user.role === 'manajer_sdm' || 
-    (req.user.role === 'kepala_cabang' && employee.cabangId.toString() === req.user.cabangId.toString()) ||
-    employee._id.toString() === req.user._id.toString(); // Users can update their own data
-  
-  if (!isAuthorized) {
-    return next(new ErrorResponse('Tidak diizinkan untuk mengubah data pegawai ini', 403));
-  }
-  
-  // Users can only update their personal info, not role or branch
-  if (employee._id.toString() === req.user._id.toString() && 
-      (req.body.roleId || req.body.cabangId || req.body.aktif !== undefined)) {
-    return next(new ErrorResponse('Pegawai tidak dapat mengubah role, cabang, atau status aktif sendiri', 403));
-  }
-  
-  // Branch heads cannot change roles to non-staff roles
-  if (req.user.role === 'kepala_cabang' && req.body.roleId) {
-    const newRole = await Role.findById(req.body.roleId);
-    if (!newRole || !['staff_admin', 'staff_penjualan', 'kasir', 'checker', 'supir'].includes(newRole.kodeRole)) {
-      return next(new ErrorResponse('Kepala cabang hanya dapat mengubah pegawai ke role staff', 403));
-    }
-  }
-  
-  // Check if username or email is being changed and already exists
-  if (req.body.username || req.body.email) {
-    // Build filter to check uniqueness but exclude the current user
-    const uniqueCheckFilters = [];
-    
-    if (req.body.username) {
-      uniqueCheckFilters.push({ username: req.body.username });
-    }
-    
-    if (req.body.email && req.body.email !== '') {
-      uniqueCheckFilters.push({ email: req.body.email });
-    }
-    
-    if (uniqueCheckFilters.length > 0) {
-      const existingUser = await User.findOne({
-        $or: uniqueCheckFilters,
-        _id: { $ne: req.params.id }
-      });
-      
-      if (existingUser) {
-        return next(new ErrorResponse('Username atau email sudah digunakan oleh pegawai lain', 400));
-      }
-    }
-  }
-  
-  // Process update data
-  const updateData = { ...req.body };
-  
-  // If roleId is changed, update the role code too
-  if (updateData.roleId && updateData.roleId !== employee.roleId.toString()) {
-    const newRole = await Role.findById(updateData.roleId);
-    if (!newRole) {
-      return next(new ErrorResponse('Role tidak valid', 400));
-    }
-    updateData.role = newRole.kodeRole;
-  }
-  
-  // Check if cabangId is valid when changed
-  if (updateData.cabangId && updateData.cabangId !== employee.cabangId.toString()) {
-    const branch = await Branch.findById(updateData.cabangId);
-    if (!branch) {
-      return next(new ErrorResponse('Cabang tidak valid', 400));
-    }
-  }
-  
-  // Process file uploads
-  if (req.files) {
-    // Handle profile photo
-    if (req.files.fotoProfil) {
-      // Delete old file if exists and not default
-      if (employee.fotoProfil && employee.fotoProfil !== 'default.jpg') {
-        const oldFilePath = path.join(__dirname, '..', employee.fotoProfil);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
-      }
-      
-      const profileFile = req.files.fotoProfil[0];
-      updateData.fotoProfil = `${config.uploadPath}/${profileFile.filename}`;
-    }
-    
-    // Handle KTP document
-    if (req.files['dokumen.ktp']) {
-      // Delete old file if exists
-      if (employee.dokumen && employee.dokumen.ktp) {
-        const oldFilePath = path.join(__dirname, '..', employee.dokumen.ktp);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
-      }
-      
-      if (!updateData.dokumen) {
-        updateData.dokumen = { ...employee.dokumen } || {};
-      }
-      const ktpFile = req.files['dokumen.ktp'][0];
-      updateData.dokumen.ktp = `${config.uploadPath}/${ktpFile.filename}`;
-    }
-    
-    // Handle NPWP document
-    if (req.files['dokumen.npwp']) {
-      // Delete old file if exists
-      if (employee.dokumen && employee.dokumen.npwp) {
-        const oldFilePath = path.join(__dirname, '..', employee.dokumen.npwp);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
-      }
-      
-      if (!updateData.dokumen) {
-        updateData.dokumen = { ...employee.dokumen } || {};
-      }
-      const npwpFile = req.files['dokumen.npwp'][0];
-      updateData.dokumen.npwp = `${config.uploadPath}/${npwpFile.filename}`;
-    }
-  }
-  
-  // Handle password update
-  if (updateData.password) {
-    if (updateData.password.trim() === '') {
-      // Empty password means no change
-      delete updateData.password;
-    } else {
-      // Hash the new password
-      const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(updateData.password, salt);
-    }
-  }
-  
-  // Update employee
-  const updatedEmployee = await User.findByIdAndUpdate(
-    req.params.id,
-    updateData,
-    {
-      new: true,
-      runValidators: true
-    }
-  )
-    .populate('cabangId', 'namaCabang')
-    .populate('roleId', 'namaRole permissions')
-    .select('-password');
-  
-  res.status(200).json({
-    success: true,
-    data: updatedEmployee,
-    message: 'Data pegawai berhasil diperbarui'
-  });
-});
-
-/**
- * @desc      Delete employee
- * @route     DELETE /api/employees/:id
- * @access    Private (Directors, HR Managers, Admin Managers)
- */
-exports.deleteEmployee = asyncHandler(async (req, res, next) => {
-  const employee = await User.findById(req.params.id);
-  
-  if (!employee) {
-    return next(new ErrorResponse('Pegawai tidak ditemukan', 404));
-  }
-  
-  // Check authorization (only directors and managers can delete)
-  const isAuthorized = 
-    req.user.role === 'direktur' || 
-    req.user.role === 'manajer_admin' || 
-    req.user.role === 'manajer_sdm';
-  
-  if (!isAuthorized) {
-    return next(new ErrorResponse('Tidak diizinkan untuk menghapus pegawai', 403));
-  }
-  
-  // Can't delete own account
-  if (employee._id.toString() === req.user._id.toString()) {
-    return next(new ErrorResponse('Tidak dapat menghapus akun sendiri', 400));
-  }
-  
-  // Delete files
-  if (employee.fotoProfil && employee.fotoProfil !== 'default.jpg') {
-    const profilePath = path.join(__dirname, '..', employee.fotoProfil);
-    if (fs.existsSync(profilePath)) {
-      fs.unlinkSync(profilePath);
-    }
-  }
-  
-  if (employee.dokumen) {
-    if (employee.dokumen.ktp) {
-      const ktpPath = path.join(__dirname, '..', employee.dokumen.ktp);
-      if (fs.existsSync(ktpPath)) {
-        fs.unlinkSync(ktpPath);
-      }
-    }
-    
-    if (employee.dokumen.npwp) {
-      const npwpPath = path.join(__dirname, '..', employee.dokumen.npwp);
-      if (fs.existsSync(npwpPath)) {
-        fs.unlinkSync(npwpPath);
-      }
-    }
-  }
-  
-  // Hard delete or soft delete based on query param
-  if (req.query.hardDelete === 'true' && req.user.role === 'direktur') {
-    await employee.deleteOne();
-  } else {
-    // Soft delete
-    employee.aktif = false;
-    await employee.save();
-  }
-  
-  res.status(200).json({
-    success: true,
-    data: {},
-    message: 'Pegawai berhasil dihapus'
-  });
-});
-
+// Role controllers
 /**
  * @desc      Get all roles
  * @route     GET /api/roles

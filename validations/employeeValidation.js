@@ -59,6 +59,12 @@ const employeeSchema = z.object({
 const updateEmployeeSchema = employeeSchema.partial().extend({
   // Always require ID for updates
   _id: objectIdSchema,
+  // Make password truly optional for updates
+  password: z.string()
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+      'Password harus mengandung minimal 8 karakter, huruf besar, huruf kecil, angka, dan karakter spesial')
+    .or(z.literal(''))
+    .optional(),
 });
 
 // Role schema for validation
