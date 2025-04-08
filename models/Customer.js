@@ -23,11 +23,13 @@ const CustomerSchema = new mongoose.Schema({
   },
   kelurahan: {
     type: String,
-    required: [true, 'Kelurahan harus diisi']
+    // Make optional to match frontend form
+    default: ''
   },
   kecamatan: {
     type: String,
-    required: [true, 'Kecamatan harus diisi']
+    // Make optional to match frontend form
+    default: ''
   },
   kota: {
     type: String,
@@ -71,25 +73,15 @@ const CustomerSchema = new mongoose.Schema({
   }
 });
 
-// Create index for efficient querying
-CustomerSchema.index({ nama: 1 });
-CustomerSchema.index({ telepon: 1 });
-CustomerSchema.index({ cabangId: 1 });
-CustomerSchema.index({ tipe: 1 });
-CustomerSchema.index({ createdAt: -1 });
-
 // Update updatedAt on update
 CustomerSchema.pre('findOneAndUpdate', function() {
   this.set({ updatedAt: Date.now() });
 });
 
-// Virtual for full address
-CustomerSchema.virtual('alamatLengkap').get(function() {
-  return `${this.alamat}, ${this.kelurahan}, ${this.kecamatan}, ${this.kota}, ${this.provinsi}`;
-});
-
-// Ensure virtuals are included when converting to JSON
-CustomerSchema.set('toJSON', { virtuals: true });
-CustomerSchema.set('toObject', { virtuals: true });
+// Create index for efficient querying
+CustomerSchema.index({ nama: 1 });
+CustomerSchema.index({ telepon: 1 });
+CustomerSchema.index({ cabangId: 1 });
+CustomerSchema.index({ tipe: 1 });
 
 module.exports = mongoose.model('Customer', CustomerSchema);

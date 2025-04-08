@@ -99,33 +99,27 @@ exports.getCustomer = async (req, res) => {
 // @access    Private
 exports.createCustomer = async (req, res) => {
   try {
-    // Set cabangId dan createdBy dari user yang login
-    if (!req.body.cabangId) {
-      req.body.cabangId = req.user.cabangId;
-    }
+    // Add the current user as creator
     req.body.createdBy = req.user.id;
-
-    // Normalisasi tipe customer ke lowercase
-    if (req.body.tipe) {
-      req.body.tipe = req.body.tipe.toLowerCase();
-    }
-
-    // Buat customer baru
+    
+    // Create customer
     const customer = await Customer.create(req.body);
 
-    // Populate data untuk response
+    // Populate references for response
     const populatedCustomer = await Customer.findById(customer._id)
       .populate("cabangId", "namaCabang")
       .populate("createdBy", "nama");
 
     res.status(201).json({
       success: true,
+      message: "Pelanggan berhasil dibuat",
       data: populatedCustomer,
     });
   } catch (error) {
+    console.error("Error creating customer:", error);
     res.status(500).json({
       success: false,
-      message: "Gagal membuat pelanggan baru",
+      message: "Gagal membuat pelanggan",
       error: error.message,
     });
   }
@@ -136,50 +130,39 @@ exports.createCustomer = async (req, res) => {
 // @access    Private
 exports.updateCustomer = async (req, res) => {
   try {
-    console.log("Updating customer with ID:", req.params.id);
-    console.log("Update data received:", req.body);
-    
-    // Create update data object
-    const updateData = { ...req.body };
-    
-    // Ensure cabangId is properly handled
-    if (updateData.cabangId) {
-      console.log("Original cabangId:", updateData.cabangId);
-      // Make sure it's a valid ObjectId string
-      updateData.cabangId = updateData.cabangId.toString();
-      console.log("Formatted cabangId for update:", updateData.cabangId);
-    }
-    
-    // Find customer by ID and update
-    const customer = await Customer.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      {
-        new: true,
-        runValidators: true
-      }
-    ).populate("cabangId", "namaCabang");
-    
+    // Find customer first to check if exists
+    let customer = await Customer.findById(req.params.id);
+
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Pelanggan tidak ditemukan"
+        message: "Pelanggan tidak ditemukan",
       });
     }
-    
-    console.log("Updated customer:", customer);
-    
+
+    // Update customer
+    customer = await Customer.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, updatedAt: Date.now() },
+      {
+        new: true,
+        runValidators: true,
+      }
+    )
+      .populate("cabangId", "namaCabang")
+      .populate("createdBy", "nama");
+
     res.status(200).json({
       success: true,
       message: "Pelanggan berhasil diperbarui",
-      data: customer
+      data: customer,
     });
   } catch (error) {
     console.error("Error updating customer:", error);
     res.status(500).json({
       success: false,
       message: "Gagal memperbarui pelanggan",
-      error: error.message
+      error: error.message,
     });
   }
 };

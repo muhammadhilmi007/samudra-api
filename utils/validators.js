@@ -63,13 +63,14 @@ exports.customerSchema = z.object({
   nama: z.string().min(3, 'Nama pelanggan minimal 3 karakter'),
   tipe: z.enum(['pengirim', 'penerima', 'keduanya']),
   alamat: z.string().min(5, 'Alamat minimal 5 karakter'),
-  kelurahan: z.string().min(2, 'Kelurahan minimal 2 karakter'),
-  kecamatan: z.string().min(2, 'Kecamatan minimal 2 karakter'),
+  kelurahan: z.string().optional().default(''),
+  kecamatan: z.string().optional().default(''),
   kota: z.string().min(2, 'Kota minimal 2 karakter'),
   provinsi: z.string().min(2, 'Provinsi minimal 2 karakter'),
   telepon: z.string().min(8, 'Telepon minimal 8 karakter'),
-  email: z.string().email('Email tidak valid').optional(),
-  perusahaan: z.string().optional()
+  email: z.string().email('Email tidak valid').optional().or(z.literal('')),
+  perusahaan: z.string().optional().default(''),
+  cabangId: z.string().min(1, 'Cabang harus diisi')
 });
 
 // Vehicle validation schema
