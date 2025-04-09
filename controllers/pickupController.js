@@ -149,95 +149,91 @@ exports.getPickup = asyncHandler(async (req, res) => {
 // @desc      Create new pickup
 // @route     POST /api/pickups
 // @access    Private
+// Add this function to handle pickup creation with proper validation
 exports.createPickup = asyncHandler(async (req, res) => {
-  // Validate data
-  if (!req.body.pengirimId) {
-    return res.status(400).json({
-      success: false,
-      message: "Pengirim harus diisi",
-    });
+  // Get branch ID from authenticated user
+  req.body.cabangId = req.user.cabangId;
+  req.body.userId = req.user._id;
+
+  // Generate pickup number
+  const dateString = getReverseDateString();
+  const latestPickup = await Pickup.findOne({}, { noPengambilan: 1 })
+    .sort({ createdAt: -1 })
+    .limit(1);
+
+  let sequence = 1;
+  if (latestPickup && latestPickup.noPengambilan) {
+    const lastNumber = parseInt(latestPickup.noPengambilan.split("-")[2]);
+    sequence = lastNumber + 1;
   }
 
-  if (!req.body.supirId) {
-    return res.status(400).json({
-      success: false,
-      message: "Supir harus diisi",
-    });
-  }
-
-  if (!req.body.kendaraanId) {
-    return res.status(400).json({
-      success: false,
-      message: "Kendaraan harus diisi",
-    });
-  }
-
-  if (!req.body.alamatPengambilan) {
-    return res.status(400).json({
-      success: false,
-      message: "Alamat pengambilan harus diisi",
-    });
-  }
-
-  // Check if sender exists
-  const pengirim = await Customer.findById(req.body.pengirimId);
-  if (!pengirim) {
-    return res.status(404).json({
-      success: false,
-      message: "Pengirim tidak ditemukan",
-    });
-  }
-
-  // Check if vehicle exists
-  const kendaraan = await Vehicle.findById(req.body.kendaraanId);
-  if (!kendaraan) {
-    return res.status(404).json({
-      success: false,
-      message: "Kendaraan tidak ditemukan",
-    });
-  }
-
-  // Set userId and cabangId from logged in user
-  req.body.userId = req.user.id;
-
-  // Use branch from body if provided, otherwise use user's branch
-  if (!req.body.cabangId) {
-    req.body.cabangId = req.user.cabangId;
-  }
-
-  // Set date if not provided
-  if (!req.body.tanggal) {
-    req.body.tanggal = new Date();
-  }
-
-  // Set default status
-  req.body.status = "PENDING";
+  req.body.noPengambilan = `PU-${dateString}-${formatNumber(sequence)}`;
 
   // Create pickup
   const pickup = await Pickup.create(req.body);
 
-  // Populate data for response
-  const populatedPickup = await Pickup.findById(pickup._id)
-    .populate("pengirimId", "nama alamat telepon")
-    .populate("supirId", "nama")
-    .populate("kenekId", "nama")
-    .populate("kendaraanId", "noPolisi namaKendaraan")
-    .populate("sttIds", "noSTT")
-    .populate("userId", "nama")
-    .populate("cabangId", "namaCabang")
-    .populate("requestId", "noRequest");
-
-  // If created from request, update the request
+  // If created from request, update request status
   if (req.body.requestId) {
     await PickupRequest.findByIdAndUpdate(req.body.requestId, {
-      pickupId: pickup._id,
       status: "FINISH",
+      pickupId: pickup._id,
     });
   }
 
   res.status(201).json({
     success: true,
-    data: populatedPickup,
+    data: pickup,
+  });
+});
+
+// Add this function to handle status updates with proper validation
+// @desc      Update pickup status
+// @route     PUT /api/pickups/:id/status
+// @access    Private
+exports.updatePickupStatus = asyncHandler(async (req, res) => {
+  const { status, notes } = req.body;
+
+  // Validate status
+  if (!['PENDING', 'BERANGKAT', 'SELESAI', 'CANCELLED'].includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message: "Status tidak valid",
+    });
+  }
+
+  // Find pickup
+  const pickup = await Pickup.findById(req.params.id);
+
+  if (!pickup) {
+    return res.status(404).json({
+      success: false,
+      message: "Pengambilan tidak ditemukan",
+    });
+  }
+
+  // Update status and notes
+  pickup.status = status;
+  
+  // Only update notes if provided
+  if (notes) {
+    pickup.notes = notes;
+  }
+
+  // Set timestamps for specific status changes
+  if (status === 'BERANGKAT' && pickup.status !== 'BERANGKAT') {
+    pickup.waktuBerangkat = Date.now();
+  } else if (status === 'SELESAI' && pickup.status !== 'SELESAI') {
+    pickup.waktuPulang = Date.now();
+  }
+
+  await pickup.save();
+
+  // Return updated pickup with populated fields
+  const updatedPickup = await Pickup.findById(req.params.id).populate(populateFields);
+
+  res.status(200).json({
+    success: true,
+    data: updatedPickup,
   });
 });
 
@@ -467,65 +463,17 @@ exports.getPickupsBySender = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc      Update pickup status
-// @route     PUT /api/pickups/:id/status
+// @desc      Get pickups by driver
+// @route     GET /api/pickups/by-driver/:driverId
 // @access    Private
-exports.updatePickupStatus = asyncHandler(async (req, res) => {
-  const { status, notes } = req.body;
-
-  if (!status) {
-    return res.status(400).json({
-      success: false,
-      message: "Status harus diisi",
-    });
-  }
-
-  const validStatuses = ["PENDING", "BERANGKAT", "SELESAI", "CANCELLED"];
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({
-      success: false,
-      message: "Status tidak valid",
-    });
-  }
-
-  let updateData = { status };
-
-  if (notes) {
-    updateData.notes = notes;
-  }
-
-  // If status is BERANGKAT, set waktuBerangkat to now
-  if (status === "BERANGKAT") {
-    updateData.waktuBerangkat = new Date();
-  }
-
-  // If status is SELESAI, set waktuPulang to now
-  if (status === "SELESAI") {
-    updateData.waktuPulang = new Date();
-  }
-
-  const pickup = await Pickup.findByIdAndUpdate(req.params.id, updateData, {
-    new: true,
-    runValidators: true,
-  })
-    .populate("pengirimId", "nama alamat telepon")
-    .populate("supirId", "nama")
-    .populate("kenekId", "nama")
-    .populate("kendaraanId", "noPolisi namaKendaraan")
-    .populate("sttIds", "noSTT")
-    .populate("userId", "nama")
-    .populate("cabangId", "namaCabang")
-    .populate("requestId", "noRequest");
-
-  if (!pickup) {
-    return res.status(404).json({
-      success: false,
-      message: "Pengambilan tidak ditemukan",
-    });
-  }
+exports.getPickupsByDriver = asyncHandler(async (req, res) => {
+  const pickups = await Pickup.find({ supirId: req.params.driverId })
+    .populate(populateFields)
+    .sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,
-    data: pickup,
+    count: pickups.length,
+    data: pickups,
   });
 });

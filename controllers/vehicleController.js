@@ -80,10 +80,7 @@ exports.getVehicles = asyncHandler(async (req, res) => {
   const vehicles = await Vehicle.find(filter)
     .populate("cabangId", "namaCabang")
     .populate("supirId", "nama")
-    .populate("kenekId", "nama")
-    .skip(startIndex)
-    .limit(limit)
-    .sort("-createdAt");
+    .populate("kenekId", "nama");
 
   res.status(200).json({
     success: true,
@@ -196,127 +193,41 @@ exports.createVehicle = asyncHandler(async (req, res) => {
 // @route     PUT /api/vehicles/:id
 // @access    Private
 exports.updateVehicle = asyncHandler(async (req, res) => {
-  // Process file upload
-  upload(req, res, async function (err) {
-    if (err instanceof multer.MulterError) {
-      return res.status(400).json({
-        success: false,
-        message: `Upload error: ${err.message}`,
-      });
-    } else if (err) {
-      return res.status(400).json({
-        success: false,
-        message: `${err.message}`,
-      });
+  // Find vehicle by id
+  let vehicle = await Vehicle.findById(req.params.id);
+
+  if (!vehicle) {
+    return res.status(404).json({
+      success: false,
+      message: "Kendaraan tidak ditemukan",
+    });
+  }
+
+  // Process the request body to handle empty or invalid ObjectId fields
+  const updateData = { ...req.body };
+  
+  // Handle kenekId - if it's empty string or "all", set to null
+  if (updateData.kenekId === "" || updateData.kenekId === "all") {
+    updateData.kenekId = null;
+  }
+  
+  // Update vehicle data with the processed data
+  vehicle = await Vehicle.findByIdAndUpdate(
+    req.params.id,
+    updateData,
+    {
+      new: true,
+      runValidators: true,
     }
+  ).populate([
+    { path: 'supirId', select: 'nama jabatan' },
+    { path: 'kenekId', select: 'nama jabatan' },
+    { path: 'cabangId', select: 'namaCabang' }
+  ]);
 
-    try {
-      // Check if vehicle exists
-      const vehicle = await Vehicle.findById(req.params.id);
-
-      if (!vehicle) {
-        return res.status(404).json({
-          success: false,
-          message: "Kendaraan tidak ditemukan",
-        });
-      }
-
-      // Check if number plate already exists (if being updated)
-      if (req.body.noPolisi && req.body.noPolisi !== vehicle.noPolisi) {
-        const existingVehicle = await Vehicle.findOne({
-          noPolisi: req.body.noPolisi,
-          _id: { $ne: req.params.id },
-        });
-
-        if (existingVehicle) {
-          return res.status(400).json({
-            success: false,
-            message: "Nomor polisi sudah terdaftar",
-          });
-        }
-      }
-
-      // Prepare vehicle data for update
-      const vehicleData = {
-        ...req.body,
-      };
-
-      // Convert frontend form field to database field if provided
-      if (req.body.tipe) {
-        vehicleData.tipe = req.body.tipe === "Antar Cabang" ? "antar_cabang" : req.body.tipe;
-      }
-
-      // Add file paths if files were uploaded
-      if (req.files) {
-        if (req.files.fotoSupir) {
-          // Delete old file if exists
-          if (vehicle.fotoSupir) {
-            const oldPath = path.join(__dirname, "..", vehicle.fotoSupir);
-            if (fs.existsSync(oldPath)) {
-              fs.unlinkSync(oldPath);
-            }
-          }
-          vehicleData.fotoSupir = `/uploads/vehicles/${req.files.fotoSupir[0].filename}`;
-        }
-
-        if (req.files.fotoKTPSupir) {
-          // Delete old file if exists
-          if (vehicle.fotoKTPSupir) {
-            const oldPath = path.join(__dirname, "..", vehicle.fotoKTPSupir);
-            if (fs.existsSync(oldPath)) {
-              fs.unlinkSync(oldPath);
-            }
-          }
-          vehicleData.fotoKTPSupir = `/uploads/vehicles/${req.files.fotoKTPSupir[0].filename}`;
-        }
-
-        if (req.files.fotoKenek) {
-          // Delete old file if exists
-          if (vehicle.fotoKenek) {
-            const oldPath = path.join(__dirname, "..", vehicle.fotoKenek);
-            if (fs.existsSync(oldPath)) {
-              fs.unlinkSync(oldPath);
-            }
-          }
-          vehicleData.fotoKenek = `/uploads/vehicles/${req.files.fotoKenek[0].filename}`;
-        }
-
-        if (req.files.fotoKTPKenek) {
-          // Delete old file if exists
-          if (vehicle.fotoKTPKenek) {
-            const oldPath = path.join(__dirname, "..", vehicle.fotoKTPKenek);
-            if (fs.existsSync(oldPath)) {
-              fs.unlinkSync(oldPath);
-            }
-          }
-          vehicleData.fotoKTPKenek = `/uploads/vehicles/${req.files.fotoKTPKenek[0].filename}`;
-        }
-      }
-
-      // Update vehicle
-      const updatedVehicle = await Vehicle.findByIdAndUpdate(
-        req.params.id,
-        vehicleData,
-        {
-          new: true,
-          runValidators: true,
-        }
-      )
-        .populate("cabangId", "namaCabang")
-        .populate("supirId", "nama")
-        .populate("kenekId", "nama");
-
-      res.status(200).json({
-        success: true,
-        data: updatedVehicle,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Gagal mengupdate kendaraan",
-        error: error.message,
-      });
-    }
+  res.status(200).json({
+    success: true,
+    data: vehicle,
   });
 });
 
@@ -386,174 +297,148 @@ exports.deleteVehicle = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc      Upload vehicle photo
+// @desc      Upload vehicle photo (driver or helper)
 // @route     POST /api/vehicles/:id/upload-photo
 // @access    Private
 exports.uploadVehiclePhoto = asyncHandler(async (req, res) => {
-  // Configure multer for photo upload
-  const photoUpload = multer({
+  const vehicle = await Vehicle.findById(req.params.id);
+  
+  if (!vehicle) {
+    return res.status(404).json({
+      success: false,
+      message: "Kendaraan tidak ditemukan",
+    });
+  }
+
+  // Handle file upload with multer
+  const uploadSingle = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: function (req, file, cb) {
-      if (file.mimetype.startsWith("image/")) {
+      if (
+        file.mimetype === "image/png" ||
+        file.mimetype === "image/jpg" ||
+        file.mimetype === "image/jpeg"
+      ) {
         cb(null, true);
       } else {
-        cb(new Error("Please upload an image file"), false);
+        cb(new Error("Only PNG, JPG and JPEG files are allowed"), false);
       }
     },
-  }).single("photo");
+  }).single('photo');
 
-  photoUpload(req, res, async function (err) {
-    if (err instanceof multer.MulterError) {
+  uploadSingle(req, res, async (err) => {
+    if (err) {
       return res.status(400).json({
         success: false,
-        message: `Upload error: ${err.message}`,
-      });
-    } else if (err) {
-      return res.status(400).json({
-        success: false,
-        message: `${err.message}`,
+        message: err.message,
       });
     }
 
-    try {
-      // Check if vehicle exists
-      const vehicle = await Vehicle.findById(req.params.id);
-
-      if (!vehicle) {
-        return res.status(404).json({
-          success: false,
-          message: "Kendaraan tidak ditemukan",
-        });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: "Please upload a file",
-        });
-      }
-
-      // Get field from request params or body
-      const photoType = req.query.photoType || req.body.photoType || "driver"; // default to driver photo
-      const fieldToUpdate =
-        photoType === "driver" || photoType === "driverPhoto" ? "fotoSupir" : "fotoKenek";
-
-      // Delete old file if exists
-      if (vehicle[fieldToUpdate]) {
-        const oldPath = path.join(__dirname, "..", vehicle[fieldToUpdate]);
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
-        }
-      }
-
-      // Update vehicle with new photo path
-      const photoUrl = `/uploads/vehicles/${req.file.filename}`;
-
-      const updatedVehicle = await Vehicle.findByIdAndUpdate(
-        req.params.id,
-        { [fieldToUpdate]: photoUrl },
-        { new: true }
-      );
-
-      res.status(200).json({
-        success: true,
-        photoUrl,
-        message: "Foto berhasil diunggah",
-        data: updatedVehicle
-      });
-    } catch (error) {
-      res.status(500).json({
+    if (!req.file) {
+      return res.status(400).json({
         success: false,
-        message: "Gagal mengunggah foto",
-        error: error.message,
+        message: "Silakan pilih file untuk diunggah",
       });
     }
+
+    // Get photo type from query params (driver or helper)
+    const photoType = req.query.type;
+    
+    if (photoType !== 'driver' && photoType !== 'helper') {
+      return res.status(400).json({
+        success: false,
+        message: "Tipe foto tidak valid",
+      });
+    }
+
+    // Set the file path in the database
+    const fieldName = photoType === 'driver' ? 'fotoSupir' : 'fotoKenek';
+    const filePath = `/uploads/vehicles/${req.file.filename}`;
+    
+    // Update vehicle with the new photo
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      req.params.id,
+      { [fieldName]: filePath },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedVehicle,
+    });
   });
 });
 
-// @desc      Upload vehicle document
+// @desc      Upload vehicle document (driver or helper ID card)
 // @route     POST /api/vehicles/:id/upload-document
 // @access    Private
 exports.uploadVehicleDocument = asyncHandler(async (req, res) => {
-  // Configure multer for document upload
-  const documentUpload = multer({
+  const vehicle = await Vehicle.findById(req.params.id);
+  
+  if (!vehicle) {
+    return res.status(404).json({
+      success: false,
+      message: "Kendaraan tidak ditemukan",
+    });
+  }
+
+  // Handle file upload with multer
+  const uploadSingle = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: function (req, file, cb) {
-      if (file.mimetype.startsWith("image/")) {
+      if (
+        file.mimetype === "image/png" ||
+        file.mimetype === "image/jpg" ||
+        file.mimetype === "image/jpeg"
+      ) {
         cb(null, true);
       } else {
-        cb(new Error("Please upload an image file for document"), false);
+        cb(new Error("Only PNG, JPG and JPEG files are allowed"), false);
       }
     },
-  }).single("document");
+  }).single('document');
 
-  documentUpload(req, res, async function (err) {
-    if (err instanceof multer.MulterError) {
+  uploadSingle(req, res, async (err) => {
+    if (err) {
       return res.status(400).json({
         success: false,
-        message: `Upload error: ${err.message}`,
-      });
-    } else if (err) {
-      return res.status(400).json({
-        success: false,
-        message: `${err.message}`,
+        message: err.message,
       });
     }
 
-    try {
-      // Check if vehicle exists
-      const vehicle = await Vehicle.findById(req.params.id);
-
-      if (!vehicle) {
-        return res.status(404).json({
-          success: false,
-          message: "Kendaraan tidak ditemukan",
-        });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: "Please upload a file",
-        });
-      }
-
-      // Get field from request params or body
-      const documentType = req.query.documentType || req.body.documentType || "driverIDCard"; // default to driver ID card
-      const fieldToUpdate =
-        documentType === "driverIDCard" ? "fotoKTPSupir" : "fotoKTPKenek";
-
-      // Delete old file if exists
-      if (vehicle[fieldToUpdate]) {
-        const oldPath = path.join(__dirname, "..", vehicle[fieldToUpdate]);
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
-        }
-      }
-
-      // Update vehicle with new document path
-      const documentUrl = `/uploads/vehicles/${req.file.filename}`;
-
-      const updatedVehicle = await Vehicle.findByIdAndUpdate(
-        req.params.id,
-        { [fieldToUpdate]: documentUrl },
-        { new: true }
-      );
-
-      res.status(200).json({
-        success: true,
-        documentUrl,
-        message: "Dokumen berhasil diunggah",
-        data: updatedVehicle
-      });
-    } catch (error) {
-      res.status(500).json({
+    if (!req.file) {
+      return res.status(400).json({
         success: false,
-        message: "Gagal mengunggah dokumen",
-        error: error.message,
+        message: "Silakan pilih file untuk diunggah",
       });
     }
+
+    // Get document type from query params (driverIDCard or helperIDCard)
+    const documentType = req.query.type;
+    
+    if (documentType !== 'driverIDCard' && documentType !== 'helperIDCard') {
+      return res.status(400).json({
+        success: false,
+        message: "Tipe dokumen tidak valid",
+      });
+    }
+
+    // Set the file path in the database
+    const fieldName = documentType === 'driverIDCard' ? 'fotoKTPSupir' : 'fotoKTPKenek';
+    const filePath = `/uploads/vehicles/${req.file.filename}`;
+    
+    // Update vehicle with the new document
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      req.params.id,
+      { [fieldName]: filePath },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedVehicle,
+    });
   });
 });

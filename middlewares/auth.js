@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const config = require("../config/config");
 const asyncHandler = require("./asyncHandler");
+const Pickup = require("../models/Pickup");
 
 // Protect routes - middleware to require login
 exports.protect = asyncHandler(async (req, res, next) => {
@@ -98,6 +99,22 @@ exports.checkPermission = (...permissions) => {
         success: false,
         message: "Akses tidak diizinkan, silakan login terlebih dahulu",
       });
+    }
+
+    // Special case for drivers accessing their own pickups
+    if (req.user.role === 'supir' && 
+        req.path.startsWith('/pickups/') && 
+        !req.path.includes('/status')) {
+      
+      // Get pickup ID from URL
+      const pickupId = req.path.split('/')[2];
+      
+      // Check if this pickup belongs to the driver
+      const pickup = await Pickup.findById(pickupId);
+      
+      if (pickup && pickup.supirId.toString() === req.user._id.toString()) {
+        return next();
+      }
     }
 
     // Make sure user role is populated

@@ -9,7 +9,8 @@ const {
   addSTTToPickup,
   removeSTTFromPickup,
   getPickupsBySender,
-  updatePickupStatus
+  updatePickupStatus,
+  getPickupsByDriver // Tambahkan fungsi baru
 } = require('../controllers/pickupController');
 const { protect, authorize } = require('../middlewares/auth');
 
@@ -20,6 +21,8 @@ router.use(protect);
 
 // Special routes
 router.get('/by-sender/:senderId', getPickupsBySender);
+// Tambahkan route baru untuk mendapatkan pickup berdasarkan supir
+router.get('/by-driver/:driverId', getPickupsByDriver);
 router.put('/:id/add-stt', authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), addSTTToPickup);
 router.put('/:id/remove-stt', authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional'), removeSTTFromPickup);
 router.put('/:id/status', authorize('admin', 'direktur', 'manajerOperasional', 'kepalaGudang', 'stafOperasional', 'supir'), updatePickupStatus);
