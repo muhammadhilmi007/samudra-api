@@ -1,177 +1,221 @@
+// models/Pickup.js - Improved pickup model
 const mongoose = require('mongoose');
 
-const statusHistorySchema = new mongoose.Schema({
-  status: {
-    type: String,
-    enum: ['PENDING', 'BERANGKAT', 'SELESAI', 'CANCELLED'],
-    required: true
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  notes: String
-});
-
-const pickupSchema = new mongoose.Schema({
-  noPengambilan: {
-    type: String,
-    required: true,
-    unique: true
-  },
+const PickupSchema = new mongoose.Schema({
+  // Basic information
   tanggal: {
     type: Date,
-    required: true,
+    required: [true, 'Tanggal harus diisi'],
     default: Date.now
+  },
+  noPengambilan: {
+    type: String,
+    required: [true, 'Nomor pengambilan harus diisi'],
+    unique: true,
+    trim: true
   },
   pengirimId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',
-    required: true
+    required: [true, 'Pengirim harus diisi']
   },
   alamatPengambilan: {
     type: String,
-    required: true,
-    minlength: [10, 'Alamat pengambilan minimal 10 karakter'],
-    maxlength: [500, 'Alamat pengambilan maksimal 500 karakter']
+    required: [true, 'Alamat pengambilan harus diisi'],
+    trim: true
   },
   tujuan: {
     type: String,
-    required: true,
-    minlength: [3, 'Tujuan minimal 3 karakter'],
-    maxlength: [200, 'Tujuan maksimal 200 karakter']
+    required: [true, 'Tujuan harus diisi'],
+    trim: true
   },
   jumlahColly: {
     type: Number,
-    required: true,
-    min: [1, 'Jumlah colly harus lebih dari 0'],
-    max: [1000, 'Jumlah colly maksimal 1000']
+    required: [true, 'Jumlah colly harus diisi'],
+    min: [1, 'Jumlah colly minimal 1']
   },
+  estimasiPengambilan: {
+    type: String,
+    trim: true
+  },
+  
+  // Related documents
+  sttIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'STT'
+  }],
+  
+  // Personnel information
   supirId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: [true, 'Supir harus diisi']
   },
   kenekId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  
+  // Vehicle information
   kendaraanId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vehicle',
-    required: true
+    required: [true, 'Kendaraan harus diisi']
   },
-  estimasiPengambilan: {
-    type: Date,
-    required: true,
-    validate: {
-      validator: function(v) {
-        return v > new Date();
-      },
-      message: 'Estimasi pengambilan harus lebih dari waktu sekarang'
-    }
+  
+  // Timestamps
+  waktuBerangkat: {
+    type: Date
   },
-  waktuBerangkat: Date,
-  waktuPulang: Date,
+  waktuPulang: {
+    type: Date
+  },
+  
+  // Status information
   status: {
     type: String,
     enum: ['PENDING', 'BERANGKAT', 'SELESAI', 'CANCELLED'],
     default: 'PENDING'
   },
-  statusHistory: [statusHistorySchema],
   notes: {
     type: String,
-    maxlength: [1000, 'Catatan maksimal 1000 karakter']
+    trim: true
   },
-  sttIds: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'STT'
-  }],
-  cabangId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Branch',
-    required: true
-  },
+  
+  // Administrative information
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: [true, 'User pembuat harus diisi']
+  },
+  cabangId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    required: [true, 'Cabang harus diisi']
   },
   requestId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PickupRequest'
+  },
+  
+  // Timestamps
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
 });
 
-// Indexes for better query performance
-pickupSchema.index({ noPengambilan: 1 });
-pickupSchema.index({ status: 1 });
-pickupSchema.index({ pengirimId: 1 });
-pickupSchema.index({ supirId: 1 });
-pickupSchema.index({ kendaraanId: 1 });
-pickupSchema.index({ cabangId: 1 });
-pickupSchema.index({ tanggal: 1 });
-
-// Virtual field for total STTs
-pickupSchema.virtual('totalSTT').get(function() {
-  return this.sttIds ? this.sttIds.length : 0;
+// Update updatedAt on every update
+PickupSchema.pre('findOneAndUpdate', function() {
+  this.set({ updatedAt: Date.now() });
 });
 
-// Pre-save middleware to validate status transitions
-pickupSchema.pre('save', async function(next) {
-  if (!this.isModified('status')) return next();
+// Generate pickup number automatically before save
+PickupSchema.pre('save', async function(next) {
+  try {
+    // Only generate pickup number for new documents
+    if (this.isNew) {
+      const Branch = mongoose.model('Branch');
+      const branch = await Branch.findById(this.cabangId);
+      
+      if (!branch) {
+        throw new Error('Cabang tidak ditemukan');
+      }
+      
+      // Get branch code (first 3 letters)
+      const branchCode = branch.namaCabang.substring(0, 3).toUpperCase();
+      
+      // Format date YYMMDD
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = String(now.getFullYear()).slice(-2);
+      const dateStr = `${day}${month}${year}`;
+      
+      // Find the last pickup with the same format for today
+      const lastPickup = await this.constructor.findOne({
+        noPengambilan: new RegExp(`PKP-${branchCode}-${dateStr}-`)
+      }).sort({ noPengambilan: -1 });
+      
+      let counter = 1;
+      
+      if (lastPickup) {
+        // Extract counter from last number
+        const lastCounter = parseInt(lastPickup.noPengambilan.split('-')[3]);
+        counter = lastCounter + 1;
+      }
+      
+      // Format counter with leading zeros
+      const counterStr = counter.toString().padStart(4, '0');
+      
+      // Set pickup number
+      this.noPengambilan = `PKP-${branchCode}-${dateStr}-${counterStr}`;
+    }
+    
+    // If status is changed to BERANGKAT, set waktuBerangkat
+    if (this.isModified('status') && this.status === 'BERANGKAT' && !this.waktuBerangkat) {
+      this.waktuBerangkat = new Date();
+    }
+    
+    // If status is changed to SELESAI, set waktuPulang
+    if (this.isModified('status') && this.status === 'SELESAI' && !this.waktuPulang) {
+      this.waktuPulang = new Date();
+    }
+    
+    // If this pickup is created from a request, update the request
+    if (this.isNew && this.requestId) {
+      const PickupRequest = mongoose.model('PickupRequest');
+      await PickupRequest.findByIdAndUpdate(
+        this.requestId,
+        { 
+          status: 'FINISH',
+          pickupId: this._id
+        }
+      );
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
-  const validTransitions = {
-    'PENDING': ['BERANGKAT', 'CANCELLED'],
-    'BERANGKAT': ['SELESAI', 'CANCELLED'],
-    'SELESAI': ['CANCELLED'],
-    'CANCELLED': ['PENDING']
+// Create virtual for status display text
+PickupSchema.virtual('statusText').get(function() {
+  const statusMap = {
+    'PENDING': 'Menunggu',
+    'BERANGKAT': 'Berangkat',
+    'SELESAI': 'Selesai',
+    'CANCELLED': 'Dibatalkan'
   };
-
-  if (this.isNew) {
-    if (this.status !== 'PENDING') {
-      throw new Error('Status awal harus PENDING');
-    }
-  } else {
-    const oldDoc = await this.constructor.findById(this._id);
-    if (!validTransitions[oldDoc.status]?.includes(this.status)) {
-      throw new Error(`Tidak dapat mengubah status dari ${oldDoc.status} ke ${this.status}`);
-    }
-  }
-
-  next();
+  
+  return statusMap[this.status] || this.status;
 });
 
-// Pre-save middleware to validate vehicle and driver availability
-pickupSchema.pre('save', async function(next) {
-  if (!this.isModified('status') || this.status !== 'BERANGKAT') return next();
-
-  const activePickup = await this.constructor.findOne({
-    _id: { $ne: this._id },
-    $or: [
-      { kendaraanId: this.kendaraanId, status: 'BERANGKAT' },
-      { supirId: this.supirId, status: 'BERANGKAT' }
-    ]
-  });
-
-  if (activePickup) {
-    throw new Error(
-      activePickup.kendaraanId.equals(this.kendaraanId)
-        ? 'Kendaraan sedang digunakan dalam pengambilan lain'
-        : 'Supir sedang bertugas dalam pengambilan lain'
-    );
-  }
-
-  next();
+// Create virtual for formatted date
+PickupSchema.virtual('tanggalFormatted').get(function() {
+  return this.tanggal ? new Date(this.tanggal).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }) : '';
 });
 
-module.exports = mongoose.model('Pickup', pickupSchema);
+// Create indexes for efficient querying
+PickupSchema.index({ noPengambilan: 1 });
+PickupSchema.index({ pengirimId: 1 });
+PickupSchema.index({ supirId: 1 });
+PickupSchema.index({ cabangId: 1 });
+PickupSchema.index({ status: 1 });
+PickupSchema.index({ tanggal: -1 });
+PickupSchema.index({ createdAt: -1 });
+
+// Make virtuals available when converting to JSON or Object
+PickupSchema.set('toJSON', { virtuals: true });
+PickupSchema.set('toObject', { virtuals: true });
+
+module.exports = mongoose.model('Pickup', PickupSchema);

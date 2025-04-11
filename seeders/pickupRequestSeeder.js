@@ -1,85 +1,155 @@
 // seeders/pickupRequestSeeder.js
-const mongoose = require("mongoose");
-const { faker } = require("@faker-js/faker");
-const PickupRequest = require("../models/PickupRequest");
-const Customer = require("../models/Customer");
-const User = require("../models/User");
-const Branch = require("../models/Branch");
+const mongoose = require('mongoose');
+const { faker } = require('@faker-js/faker/locale/id_ID');
+const PickupRequest = require('../models/PickupRequest');
+const Customer = require('../models/Customer');
+const User = require('../models/User');
+const Branch = require('../models/Branch');
 
-const seedPickupRequests = async () => {
-  faker.locale = "id_ID";
-
+/**
+ * Generate pickup request data
+ * @param {number} count - Number of pickup requests to generate
+ */
+const seedPickupRequests = async (count = 30) => {
   try {
-    // Get existing data for references
-    const customers = await Customer.find({
-      tipe: { $in: ["Pengirim", "Keduanya"] },
-    }).limit(10);
-    const branches = await Branch.find();
-    const staffUsers = await User.find({
-      roleId: {
-        $in: [
-          // Get users with admin, staff, or operational roles
-          await mongoose
-            .model("Role")
-            .find({
-              $or: [
-                { kodeRole: "manajer_operasional" },
-                { kodeRole: "staff_admin" },
-                { kodeRole: "kepala_gudang" },
-              ],
-            })
-            .select("_id"),
-        ],
-      },
+    console.log('Starting pickup request seeding...');
+    
+    // Get available senders
+    const senders = await Customer.find({
+      $or: [
+        { tipe: 'pengirim' },
+        { tipe: 'keduanya' }
+      ]
     });
-
-    if (!customers.length || !branches.length || !staffUsers.length) {
-      console.log(
-        "Required reference data not found. Make sure to run customer, branch, and user seeders first."
-      );
+    
+    if (senders.length === 0) {
+      console.warn('No senders found. Please run customer seeder first.');
       return [];
     }
-
-    // Delete existing data
+    
+    // Get available branches
+    const branches = await Branch.find({});
+    
+    if (branches.length === 0) {
+      console.warn('No branches found. Please run branch seeder first.');
+      return [];
+    }
+    
+    // Get available staff users for userId
+    const staffUsers = await User.find({
+      $or: [
+        { role: 'staff_admin' },
+        { role: 'staff_penjualan' },
+        { jabatan: { $regex: /(admin|staff|penjualan)/i } }
+      ]
+    });
+    
+    if (staffUsers.length === 0) {
+      console.warn('No staff users found. Please run user seeder first.');
+      return [];
+    }
+    
+    // Delete existing pickup requests
+    console.log('Deleting existing pickup requests...');
     await PickupRequest.deleteMany({});
-
-    // Create pickup requests data
-    const pickupRequestsData = [];
-
-    for (let i = 0; i < 30; i++) {
-      const randomCustomer =
-        customers[Math.floor(Math.random() * customers.length)];
-      const randomBranch =
-        branches[Math.floor(Math.random() * branches.length)];
-      // seeders/pickupRequestSeeder.js (continued)
-      const randomStaff =
-        staffUsers[Math.floor(Math.random() * staffUsers.length)];
-      const status = Math.random() > 0.3 ? "PENDING" : "FINISH";
-
-      // Generate a date within last 60 days
-      const createdDate = faker.date.recent(60);
-
-      pickupRequestsData.push({
-        tanggal: createdDate,
-        pengirimId: randomCustomer._id,
-        alamatPengambilan: faker.address.streetAddress(),
-        tujuan: faker.address.city(),
-        jumlahColly: Math.floor(Math.random() * 10) + 1,
+    
+    // Create pickup request data array
+    const pickupRequestData = [];
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30); // Start from 30 days ago
+    
+    // Create pickup request data
+    for (let i = 0; i < count; i++) {
+      // Pick random entities
+      const randomSender = faker.helpers.arrayElement(senders);
+      const randomBranch = faker.helpers.arrayElement(branches);
+      const randomStaff = faker.helpers.arrayElement(staffUsers);
+      
+      // Generate a random date in the past 30 days
+      const randomDays = faker.number.int({ min: 0, max: 30 });
+      const requestDate = new Date(startDate);
+      requestDate.setDate(requestDate.getDate() + randomDays);
+      
+      // Determine status based on date and random factor
+      const daysAgo = Math.floor((new Date() - requestDate) / (1000 * 60 * 60 * 24));
+      
+      let status;
+      // Older requests are more likely to be completed or cancelled
+      if (daysAgo > 15) {
+        status = Math.random() < 0.7 ? 'PENDING' : Math.random() < 0.85 ? 'FINISH' : 'CANCELLED';
+      } else if (daysAgo > 7) {
+        // Medium age requests
+        status = Math.random() < 0.8 ? 'PENDING' : Math.random() < 0.9 ? 'FINISH' : 'CANCELLED';
+      } else {
+        // Recent requests, mostly pending
+        status = Math.random() < 0.9 ? 'PENDING' : Math.random() < 0.95 ? 'FINISH' : 'CANCELLED';
+      }
+      
+      // Generate random addresses
+      const alamatPengambilan = faker.location.streetAddress(true);
+      const tujuanList = ['Jakarta', 'Bandung', 'Surabaya', 'Medan', 'Makassar', 'Semarang', 'Yogyakarta', 'Palembang'];
+      const tujuan = faker.helpers.arrayElement(tujuanList);
+      
+      // Generate random colly count and estimations
+      const jumlahColly = faker.number.int({ min: 1, max: 10 });
+      const estimasiOptions = ['Pagi (08.00-12.00)', 'Siang (12.00-15.00)', 'Sore (15.00-18.00)', '1-2 jam', '2-3 jam', 'Besok pagi'];
+      const estimasiPengambilan = Math.random() > 0.3 ? faker.helpers.arrayElement(estimasiOptions) : null;
+      
+      // Notes for some requests (30% chance)
+      let notes = null;
+      if (Math.random() > 0.7) {
+        if (status === 'CANCELLED') {
+          notes = faker.helpers.arrayElement([
+            "Request dibatalkan pelanggan",
+            "Pelanggan meminta reschedule",
+            "Barang belum siap",
+            "Pelanggan tidak dapat dihubungi"
+          ]);
+        } else if (status === 'FINISH') {
+          notes = faker.helpers.arrayElement([
+            "Pengambilan sudah dilakukan",
+            "Barang sudah diambil",
+            "Pengambilan berhasil"
+          ]);
+        } else {
+          notes = faker.helpers.arrayElement([
+            "Pelanggan minta diambil sore",
+            "Telepon dahulu sebelum pengambilan",
+            "Koordinasi dengan security",
+            "Tanyakan kepada Pak Budi"
+          ]);
+        }
+      }
+      
+      // Create pickup request object
+      const pickupRequest = {
+        tanggal: requestDate,
+        pengirimId: randomSender._id,
+        alamatPengambilan,
+        tujuan,
+        jumlahColly,
+        estimasiPengambilan,
+        notes,
+        status,
+        pickupId: null, // Will be updated if status is FINISH during pickup seeding
         userId: randomStaff._id,
         cabangId: randomBranch._id,
-        status,
-        createdAt: createdDate,
-        updatedAt: createdDate,
-      });
+        createdAt: requestDate,
+        updatedAt: status === 'PENDING' ? requestDate : new Date()
+      };
+      
+      pickupRequestData.push(pickupRequest);
     }
-
-    // Insert pickup requests
-    const pickupRequests = await PickupRequest.insertMany(pickupRequestsData);
-    console.log(`${pickupRequests.length} pickup requests seeded successfully`);
-    return pickupRequests;
+    
+    // Insert the pickup requests
+    console.log(`Inserting ${pickupRequestData.length} pickup requests...`);
+    const insertedPickupRequests = await PickupRequest.insertMany(pickupRequestData);
+    
+    console.log(`Successfully seeded ${insertedPickupRequests.length} pickup requests`);
+    return insertedPickupRequests;
   } catch (error) {
-    console.error("Error seeding pickup request data:", error);
-    return [];
+    console.error('Error seeding pickup request data:', error);
+    throw error;
   }
 };
 

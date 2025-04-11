@@ -4,70 +4,71 @@ const Role = require('../models/Role');
 // Define permission groups
 const PERMISSIONS = {
   DASHBOARD: [
-    'read_dashboard',
-    'full_dashboard_access'
+    'view_dashboard'
   ],
   USER_MANAGEMENT: [
-    'read_users',
-    'create_users',
-    'update_users',
-    'delete_users'
+    'manage_employees',
+    'manage_branch_employees',
+    'view_employees',
+    'create_employee',
+    'edit_employee',
+    'delete_employee'
   ],
   BRANCH_MANAGEMENT: [
-    'read_branches',
-    'create_branches',
-    'update_branches',
-    'delete_branches'
+    'manage_branches',
+    'view_branches',
+    'create_branch',
+    'edit_branch',
+    'delete_branch'
   ],
   DIVISION_MANAGEMENT: [
-    'read_divisions',
-    'create_divisions',
-    'update_divisions',
-    'delete_divisions'
+    'manage_divisions',
+    'view_divisions'
   ],
   STT_MANAGEMENT: [
-    'read_stt',
-    'create_stt',
-    'update_stt',
-    'delete_stt'
+    'view_stt',
+    'view_branch_stt',
+    'create_branch_stt',
+    'edit_branch_stt',
+    'update_branch_stt_status'
   ],
   PICKUP_MANAGEMENT: [
-    'read_pickups',
-    'create_pickups',
-    'update_pickups',
-    'delete_pickups'
+    'manage_pickups',
+    'manage_branch_pickups'
   ],
   VEHICLE_MANAGEMENT: [
-    'read_vehicles',
-    'create_vehicles',
-    'update_vehicles',
-    'delete_vehicles'
+    'manage_vehicles',
+    'view_vehicles',
+    'view_branch_vehicles',
+    'create_vehicle',
+    'edit_vehicle',
+    'delete_vehicle'
   ],
   FINANCE_MANAGEMENT: [
-    'read_finance',
-    'create_finance',
-    'update_finance',
-    'delete_finance',
-    'generate_reports',
-    'cash_management',
-    'accounting_management'
-  ],
-  OPERATIONAL_MANAGEMENT: [
-    'read_operations',
-    'write_operations',
-    'shipment_management',
-    'vehicle_management',
-    'route_optimization'
+    'manage_finances',
+    'view_finances',
+    'view_branch_finances',
+    'manage_branch_transactions'
   ],
   CUSTOMER_MANAGEMENT: [
-    'read_customers',
+    'manage_customers',
+    'view_customers',
+    'view_branch_customers',
     'create_customers',
-    'update_customers',
+    'edit_customers',
     'delete_customers'
   ],
-  SYSTEM_SETTINGS: [
-    'read_settings',
-    'update_settings'
+  ROLE_MANAGEMENT: [
+    'manage_roles',
+    'view_roles',
+    'create_role',
+    'edit_role',
+    'delete_role'
+  ],
+  REPORT_MANAGEMENT: [
+    'view_reports',
+    'view_branch_reports',
+    'export_reports'
   ]
 };
 
@@ -84,10 +85,9 @@ const roleData = [
       ...PERMISSIONS.PICKUP_MANAGEMENT,
       ...PERMISSIONS.VEHICLE_MANAGEMENT,
       ...PERMISSIONS.FINANCE_MANAGEMENT,
-      ...PERMISSIONS.OPERATIONAL_MANAGEMENT,
       ...PERMISSIONS.CUSTOMER_MANAGEMENT,
-      ...PERMISSIONS.SYSTEM_SETTINGS,
-      'read_all', 'write_all', 'delete_all'
+      ...PERMISSIONS.ROLE_MANAGEMENT,
+      ...PERMISSIONS.REPORT_MANAGEMENT
     ]
   },
   {
@@ -99,7 +99,7 @@ const roleData = [
       ...PERMISSIONS.BRANCH_MANAGEMENT,
       ...PERMISSIONS.DIVISION_MANAGEMENT,
       ...PERMISSIONS.CUSTOMER_MANAGEMENT,
-      ...PERMISSIONS.SYSTEM_SETTINGS
+      ...PERMISSIONS.ROLE_MANAGEMENT
     ]
   },
   {
@@ -108,8 +108,10 @@ const roleData = [
     permissions: [
       ...PERMISSIONS.DASHBOARD,
       ...PERMISSIONS.FINANCE_MANAGEMENT,
-      'read_customers',
-      'read_branches'
+      'view_customers',
+      'view_branches',
+      'view_reports',
+      'export_reports'
     ]
   },
   {
@@ -118,7 +120,9 @@ const roleData = [
     permissions: [
       ...PERMISSIONS.DASHBOARD,
       ...PERMISSIONS.CUSTOMER_MANAGEMENT,
-      'read_stt'
+      'view_stt',
+      'view_reports',
+      'export_reports'
     ]
   },
   {
@@ -126,12 +130,13 @@ const roleData = [
     kodeRole: 'manajer_operasional',
     permissions: [
       ...PERMISSIONS.DASHBOARD,
-      ...PERMISSIONS.OPERATIONAL_MANAGEMENT,
       ...PERMISSIONS.STT_MANAGEMENT,
       ...PERMISSIONS.PICKUP_MANAGEMENT,
       ...PERMISSIONS.VEHICLE_MANAGEMENT,
-      'read_customers',
-      'read_branches'
+      'view_customers',
+      'view_branches',
+      'view_reports',
+      'export_reports'
     ]
   },
   {
@@ -139,7 +144,9 @@ const roleData = [
     kodeRole: 'manajer_sdm',
     permissions: [
       ...PERMISSIONS.DASHBOARD,
-      ...PERMISSIONS.USER_MANAGEMENT
+      ...PERMISSIONS.USER_MANAGEMENT,
+      'view_reports',
+      'export_reports'
     ]
   },
   {
@@ -149,9 +156,11 @@ const roleData = [
       ...PERMISSIONS.DASHBOARD,
       ...PERMISSIONS.PICKUP_MANAGEMENT,
       ...PERMISSIONS.VEHICLE_MANAGEMENT,
-      'read_branches',
-      'read_customers',
-      'read_stt'
+      'view_branches',
+      'view_customers',
+      'view_stt',
+      'view_reports',
+      'export_reports'
     ]
   },
   {
@@ -159,100 +168,102 @@ const roleData = [
     kodeRole: 'kepala_cabang',
     permissions: [
       ...PERMISSIONS.DASHBOARD,
-      'create_users', 'read_users', 'update_users',
-      'read_branches',
-      'read_stt', 'create_stt', 'update_stt',
-      'read_pickups', 'create_pickups', 'update_pickups',
-      'read_vehicles', 'create_vehicles', 'update_vehicles',
-      'read_operations', 'write_operations',
-      'read_finance', 'create_finance',
-      'read_customers', 'create_customers', 'update_customers',
-      'local_reporting'
+      'manage_branch_employees',
+      'view_branches',
+      'view_branch_stt',
+      'create_branch_stt',
+      'edit_branch_stt',
+      'manage_branch_pickups',
+      'view_branch_vehicles',
+      'create_vehicle',
+      'edit_vehicle',
+      'view_branch_finances',
+      'manage_branch_transactions',
+      'view_branch_customers',
+      'create_customers',
+      'edit_customers',
+      'view_branch_reports'
     ]
   },
   {
     namaRole: 'Kepala Gudang',
     kodeRole: 'kepala_gudang',
     permissions: [
-      'read_dashboard',
-      'read_pickups', 'create_pickups', 'update_pickups',
-      'read_vehicles', 'update_vehicles',
-      'read_stt', 'update_stt',
-      'shipment_management'
+      'view_dashboard',
+      'manage_branch_pickups',
+      'view_branch_vehicles',
+      'edit_vehicle',
+      'view_branch_stt',
+      'edit_branch_stt'
     ]
   },
   {
     namaRole: 'Staf Admin',
     kodeRole: 'staff_admin',
     permissions: [
-      'read_dashboard',
-      'read_customers', 'create_customers', 'update_customers',
-      'read_stt', 'create_stt',
-      'read_pickups',
-      'customer_management',
-      'data_entry'
+      'view_dashboard',
+      'view_branch_customers',
+      'create_customers',
+      'edit_customers',
+      'view_branch_stt',
+      'create_branch_stt'
     ]
   },
   {
     namaRole: 'Staf Penjualan',
     kodeRole: 'staff_penjualan',
     permissions: [
-      'read_dashboard',
-      'read_customers', 'create_customers',
-      'read_stt', 'create_stt',
-      'read_pickups'
+      'view_dashboard',
+      'view_branch_customers',
+      'create_customers',
+      'view_branch_stt',
+      'create_branch_stt'
     ]
   },
   {
     namaRole: 'Kasir',
     kodeRole: 'kasir',
     permissions: [
-      'read_dashboard',
-      'read_finance', 'create_finance',
-      'financial_transactions', 
-      'invoice_management',
-      'payment_processing'
+      'view_dashboard',
+      'view_branch_finances',
+      'manage_branch_transactions'
     ]
   },
   {
     namaRole: 'Debt Collector',
     kodeRole: 'debt_collector',
     permissions: [
-      'read_dashboard',
-      'read_finance',
-      'read_customers',
-      'payment_processing'
+      'view_dashboard',
+      'view_branch_finances',
+      'view_branch_customers',
+      'manage_branch_transactions'
     ]
   },
   {
     namaRole: 'Checker',
     kodeRole: 'checker',
     permissions: [
-      'read_dashboard',
-      'read_stt', 'update_stt',
-      'read_pickups', 'update_pickups',
-      'shipment_verification', 
-      'loading_management',
-      'cargo_inspection'
+      'view_dashboard',
+      'view_branch_stt',
+      'edit_branch_stt',
+      'view_branch_vehicles'
     ]
   },
   {
     namaRole: 'Supir',
     kodeRole: 'supir',
     permissions: [
-      'read_dashboard',
-      'delivery_tracking', 
-      'pickup_management',
-      'self_profile_update'
+      'view_dashboard',
+      'view_branch_vehicles',
+      'view_branch_stt'
     ]
   },
   {
     namaRole: 'Pelanggan',
     kodeRole: 'pelanggan',
     permissions: [
-      'read_dashboard',
-      'read_stt',
-      'tracking_only'
+      'view_dashboard',
+      'view_stt'
     ]
   },
   {
@@ -260,8 +271,8 @@ const roleData = [
     kodeRole: 'kenek',
     deskripsi: 'Asisten driver kendaraan',
     permissions: [
-      'read_stt',
-      'tracking_only'
+      'view_stt',
+      'view_branch_vehicles'
     ]
   },
 ];
