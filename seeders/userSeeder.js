@@ -6,7 +6,7 @@ const Role = require('../models/Role');
 const userData = [
   {
     nama: 'Ahmad Direktur',
-    jabatan: 'Direktur Utama',
+    jabatan: 'Direktur',
     role: 'direktur',
     email: 'ahmad.direktur@samudra.co.id',
     telepon: '081234567890',
@@ -197,10 +197,13 @@ const seedUsers = async () => {
         return null;
       }
 
+      // Ensure role field is set to the kodeRole from the role document
+      // This ensures consistency between roleId and role fields
       return {
         ...user,
         cabangId: branches[index % branches.length]._id,
-        roleId: role._id
+        roleId: role._id,
+        role: role.kodeRole // Ensure this matches the kodeRole in the role document
       };
     }));
 

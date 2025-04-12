@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Role = require('../models/Role');
 
 // @desc      Login user
 // @route     POST /api/auth/login
@@ -220,6 +221,39 @@ exports.logout = async (req, res) => {
     success: true,
     message: 'Berhasil logout'
   });
+};
+
+// @desc      Refresh JWT token
+// @route     POST /api/auth/refresh-token
+// @access    Private
+exports.refreshToken = async (req, res) => {
+  try {
+    // Get user from request (set by auth middleware)
+    const user = await User.findById(req.user.id)
+      .populate('cabangId', 'namaCabang alamat kota provinsi')
+      .populate('roleId', 'namaRole kodeRole permissions');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User tidak ditemukan'
+      });
+    }
+
+    // Generate new token
+    const token = user.getSignedJwtToken();
+
+    res.status(200).json({
+      success: true,
+      token
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Gagal memperbarui token',
+      error: error.message
+    });
+  }
 };
 
 // @desc      Change password

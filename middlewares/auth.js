@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Role = require("../models/Role");
 const config = require("../config/config");
 const asyncHandler = require("./asyncHandler");
 const Pickup = require("../models/Pickup");
@@ -102,8 +103,8 @@ exports.checkPermission = (...permissions) => {
     }
 
     // Special case for drivers accessing their own pickups
-    if (req.user.role === 'supir' && 
-        req.path.startsWith('/pickups/') && 
+    if (req.user.role === 'supir' &&
+        req.path.startsWith('/pickups/') &&
         !req.path.includes('/status')) {
       
       // Get pickup ID from URL
@@ -117,23 +118,44 @@ exports.checkPermission = (...permissions) => {
       }
     }
 
-    // Make sure user role is populated
-    if (!req.user.roleId) {
-      await req.user.populate("roleId", "permissions");
-    }
+    try {
+      // Make sure user role is populated
+      if (!req.user.roleId || !req.user.roleId.permissions) {
+        await req.user.populate("roleId", "permissions");
+      }
 
-    // Check if user has any of the required permissions
-    const hasPermission = permissions.some((permission) =>
-      req.user.roleId.permissions.includes(permission)
-    );
+      // If still not populated, fetch the role directly
+      if (!req.user.roleId || !req.user.roleId.permissions) {
+        const role = await Role.findById(req.user.roleId);
+        if (!role) {
+          return res.status(403).json({
+            success: false,
+            message: "Role tidak ditemukan",
+          });
+        }
+        req.user.roleId = role;
+      }
 
-    if (!hasPermission) {
-      return res.status(403).json({
+      // Check if user has any of the required permissions
+      const hasPermission = permissions.some((permission) =>
+        req.user.roleId.permissions.includes(permission)
+      );
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          success: false,
+          message: "Anda tidak memiliki izin untuk mengakses resource ini",
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error("Error checking permissions:", error);
+      return res.status(500).json({
         success: false,
-        message: "Anda tidak memiliki izin untuk mengakses resource ini",
+        message: "Terjadi kesalahan saat memeriksa izin",
+        error: error.message,
       });
     }
-
-    next();
   };
 };

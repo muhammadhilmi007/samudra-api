@@ -149,15 +149,15 @@ UserSchema.pre('findOneAndUpdate', function() {
 // Method to generate JWT token
 UserSchema.methods.getSignedJwtToken = function() {
   return jwt.sign(
-    { 
+    {
       id: this._id,
       role: this.role,
       username: this.username,
       cabangId: this.cabangId
-    }, 
-    process.env.JWT_SECRET || config.jwtSecret, 
+    },
+    process.env.JWT_SECRET || config.jwt.secret,
     {
-      expiresIn: process.env.JWT_EXPIRE || config.jwtExpire
+      expiresIn: process.env.JWT_EXPIRE || config.jwt.expire
     }
   );
 };
