@@ -6,7 +6,7 @@ const { paginationResult } = require("../utils/helpers");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
-const asyncHandler = require('../middlewares/asyncHandler');
+const asyncHandler = require("../middlewares/asyncHandler");
 
 // Configure file upload
 const storage = multer.diskStorage({
@@ -205,24 +205,20 @@ exports.updateVehicle = asyncHandler(async (req, res) => {
 
   // Process the request body to handle empty or invalid ObjectId fields
   const updateData = { ...req.body };
-  
+
   // Handle kenekId - if it's empty string or "all", set to null
   if (updateData.kenekId === "" || updateData.kenekId === "all") {
     updateData.kenekId = null;
   }
-  
+
   // Update vehicle data with the processed data
-  vehicle = await Vehicle.findByIdAndUpdate(
-    req.params.id,
-    updateData,
-    {
-      new: true,
-      runValidators: true,
-    }
-  ).populate([
-    { path: 'supirId', select: 'nama jabatan' },
-    { path: 'kenekId', select: 'nama jabatan' },
-    { path: 'cabangId', select: 'namaCabang' }
+  vehicle = await Vehicle.findByIdAndUpdate(req.params.id, updateData, {
+    new: true,
+    runValidators: true,
+  }).populate([
+    { path: "supirId", select: "nama jabatan" },
+    { path: "kenekId", select: "nama jabatan" },
+    { path: "cabangId", select: "namaCabang" },
   ]);
 
   res.status(200).json({
@@ -302,7 +298,7 @@ exports.deleteVehicle = asyncHandler(async (req, res) => {
 // @access    Private
 exports.uploadVehiclePhoto = asyncHandler(async (req, res) => {
   const vehicle = await Vehicle.findById(req.params.id);
-  
+
   if (!vehicle) {
     return res.status(404).json({
       success: false,
@@ -325,7 +321,7 @@ exports.uploadVehiclePhoto = asyncHandler(async (req, res) => {
         cb(new Error("Only PNG, JPG and JPEG files are allowed"), false);
       }
     },
-  }).single('photo');
+  }).single("photo");
 
   uploadSingle(req, res, async (err) => {
     if (err) {
@@ -344,8 +340,8 @@ exports.uploadVehiclePhoto = asyncHandler(async (req, res) => {
 
     // Get photo type from query params (driver or helper)
     const photoType = req.query.type;
-    
-    if (photoType !== 'driver' && photoType !== 'helper') {
+
+    if (photoType !== "driver" && photoType !== "helper") {
       return res.status(400).json({
         success: false,
         message: "Tipe foto tidak valid",
@@ -353,9 +349,9 @@ exports.uploadVehiclePhoto = asyncHandler(async (req, res) => {
     }
 
     // Set the file path in the database
-    const fieldName = photoType === 'driver' ? 'fotoSupir' : 'fotoKenek';
+    const fieldName = photoType === "driver" ? "fotoSupir" : "fotoKenek";
     const filePath = `/uploads/vehicles/${req.file.filename}`;
-    
+
     // Update vehicle with the new photo
     const updatedVehicle = await Vehicle.findByIdAndUpdate(
       req.params.id,
@@ -375,7 +371,7 @@ exports.uploadVehiclePhoto = asyncHandler(async (req, res) => {
 // @access    Private
 exports.uploadVehicleDocument = asyncHandler(async (req, res) => {
   const vehicle = await Vehicle.findById(req.params.id);
-  
+
   if (!vehicle) {
     return res.status(404).json({
       success: false,
@@ -398,7 +394,7 @@ exports.uploadVehicleDocument = asyncHandler(async (req, res) => {
         cb(new Error("Only PNG, JPG and JPEG files are allowed"), false);
       }
     },
-  }).single('document');
+  }).single("document");
 
   uploadSingle(req, res, async (err) => {
     if (err) {
@@ -417,8 +413,8 @@ exports.uploadVehicleDocument = asyncHandler(async (req, res) => {
 
     // Get document type from query params (driverIDCard or helperIDCard)
     const documentType = req.query.type;
-    
-    if (documentType !== 'driverIDCard' && documentType !== 'helperIDCard') {
+
+    if (documentType !== "driverIDCard" && documentType !== "helperIDCard") {
       return res.status(400).json({
         success: false,
         message: "Tipe dokumen tidak valid",
@@ -426,9 +422,10 @@ exports.uploadVehicleDocument = asyncHandler(async (req, res) => {
     }
 
     // Set the file path in the database
-    const fieldName = documentType === 'driverIDCard' ? 'fotoKTPSupir' : 'fotoKTPKenek';
+    const fieldName =
+      documentType === "driverIDCard" ? "fotoKTPSupir" : "fotoKTPKenek";
     const filePath = `/uploads/vehicles/${req.file.filename}`;
-    
+
     // Update vehicle with the new document
     const updatedVehicle = await Vehicle.findByIdAndUpdate(
       req.params.id,
@@ -442,3 +439,37 @@ exports.uploadVehicleDocument = asyncHandler(async (req, res) => {
     });
   });
 });
+
+// @desc      Get delivery vehicles
+// @route     GET /api/vehicles/delivery
+// @access    Private
+exports.getDeliveryVehicles = async (req, res) => {
+  console.log("getDeliveryVehicles endpoint called");
+  try {
+    // Count all vehicles first to see what's available
+    const totalVehicles = await Vehicle.countDocuments();
+    console.log(`Total vehicles in database: ${totalVehicles}`);
+    
+    // TEMPORARY: Return all vehicles without filtering
+    // This is just to make the dropdown work until proper data is available
+    const vehicles = await Vehicle.find({})
+      .populate("cabangId", "namaCabang")
+      .populate("supirId", "nama")
+      .populate("kenekId", "nama");
+
+    console.log(`Found ${vehicles.length} vehicles (returning all vehicles temporarily)`);
+    
+    return res.status(200).json({
+      success: true,
+      count: vehicles.length,
+      data: vehicles,
+    });
+  } catch (error) {
+    console.error("Error in getDeliveryVehicles:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal mendapatkan data kendaraan pengiriman",
+      error: error.message,
+    });
+  }
+};

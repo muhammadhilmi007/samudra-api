@@ -1,6 +1,7 @@
 const VehicleQueue = require('../models/VehicleQueue');
 const Vehicle = require('../models/Vehicle');
 const Branch = require('../models/Branch');
+const User = require('../models/User'); // Add this line
 const { paginationResult } = require('../utils/helpers');
 const config = require('../config/config');
 
@@ -125,17 +126,17 @@ exports.createVehicleQueue = async (req, res) => {
       });
     }
     
-    // Cek tipe kendaraan (harus lansir)
-    if (kendaraan.tipe !== 'lansir') {
+    // Cek tipe kendaraan (harus lansir atau antar_cabang)
+    if (!['lansir', 'antar_cabang'].includes(kendaraan.tipe)) {
       return res.status(400).json({
         success: false,
-        message: 'Hanya kendaraan dengan tipe lansir yang dapat masuk antrian'
+        message: 'Hanya kendaraan dengan tipe lansir atau antar cabang yang dapat masuk antrian'
       });
     }
     
     // Validasi supir
     if (req.body.supirId) {
-      const supir = await Vehicle.findById(req.body.supirId);
+      const supir = await User.findById(req.body.supirId);
       if (!supir) {
         return res.status(404).json({
           success: false,
@@ -149,7 +150,7 @@ exports.createVehicleQueue = async (req, res) => {
     
     // Validasi kenek
     if (req.body.kenekId) {
-      const kenek = await Vehicle.findById(req.body.kenekId);
+      const kenek = await User.findById(req.body.kenekId);
       if (!kenek) {
         return res.status(404).json({
           success: false,
@@ -256,18 +257,18 @@ exports.updateVehicleQueue = async (req, res) => {
         });
       }
       
-      // Cek tipe kendaraan (harus lansir)
-      if (kendaraan.tipe !== 'lansir') {
+      // Cek tipe kendaraan (harus lansir atau antar_cabang)
+      if (!['lansir', 'antar_cabang'].includes(kendaraan.tipe)) {
         return res.status(400).json({
           success: false,
-          message: 'Hanya kendaraan dengan tipe lansir yang dapat masuk antrian'
+          message: 'Hanya kendaraan dengan tipe lansir atau antar cabang yang dapat masuk antrian'
         });
       }
     }
     
     // Validasi supir jika diubah
     if (req.body.supirId) {
-      const supir = await Vehicle.findById(req.body.supirId);
+      const supir = await User.findById(req.body.supirId);
       if (!supir) {
         return res.status(404).json({
           success: false,
@@ -278,7 +279,7 @@ exports.updateVehicleQueue = async (req, res) => {
     
     // Validasi kenek jika diubah
     if (req.body.kenekId) {
-      const kenek = await Vehicle.findById(req.body.kenekId);
+      const kenek = await User.findById(req.body.kenekId);
       if (!kenek) {
         return res.status(404).json({
           success: false,

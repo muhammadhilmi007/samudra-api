@@ -11,6 +11,7 @@ const {
 } = require('../controllers/truckQueueController');
 const { protect, authorize } = require('../middlewares/auth');
 const { validateBody, validateObjectId } = require('../middlewares/validator');
+const asyncHandler = require('../middlewares/asyncHandler');
 
 const router = express.Router();
 
@@ -18,20 +19,20 @@ const router = express.Router();
 router.use(protect);
 
 // Special routes
-router.get('/by-branch/:branchId', validateObjectId('branchId'), getTruckQueuesByBranch);
-router.get('/by-status/:status', getTruckQueuesByStatus);
-router.put('/:id/status', validateObjectId(), updateTruckQueueStatus);
+router.get('/by-branch/:branchId', validateObjectId('branchId'), asyncHandler(getTruckQueuesByBranch));
+router.get('/by-status/:status', asyncHandler(getTruckQueuesByStatus));
+router.put('/:id/status', validateObjectId(), asyncHandler(updateTruckQueueStatus));
 
 // CRUD routes
 router
   .route('/')
-  .get(getTruckQueues)
-  .post(authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang', 'checker'), createTruckQueue);
+  .get(asyncHandler(getTruckQueues))
+  .post(authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang', 'checker'), asyncHandler(createTruckQueue));
 
 router
   .route('/:id')
-  .get(validateObjectId(), getTruckQueue)
-  .put(validateObjectId(), authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang', 'checker'), updateTruckQueue)
-  .delete(validateObjectId(), authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang'), deleteTruckQueue);
+  .get(validateObjectId(), asyncHandler(getTruckQueue))
+  .put(validateObjectId(), authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang', 'checker'), asyncHandler(updateTruckQueue))
+  .delete(validateObjectId(), authorize('direktur', 'manajer_operasional', 'kepala_cabang', 'kepala_gudang'), asyncHandler(deleteTruckQueue));
 
 module.exports = router;

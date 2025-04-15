@@ -16,6 +16,7 @@ const {
 const { protect, authorize, checkPermission } = require("../middlewares/auth");
 const { validateBody, validateObjectId } = require("../middlewares/validator");
 const pickupValidation = require("../validations/pickupValidation");
+const asyncHandler = require("../middlewares/asyncHandler");
 
 const router = express.Router();
 
@@ -23,23 +24,23 @@ const router = express.Router();
 router.use(protect);
 
 // Special routes
-router.get("/today", getTodayPickups);
+router.get("/today", asyncHandler(getTodayPickups));
 router.get(
   "/by-sender/:senderId",
   validateObjectId("senderId"),
-  getPickupsBySender
+  asyncHandler(getPickupsBySender)
 );
 router.get(
   "/by-driver/:driverId",
   validateObjectId("driverId"),
-  getPickupsByDriver
+  asyncHandler(getPickupsByDriver)
 );
 
 router.put(
   "/:id/status",
   validateObjectId(),
   validateBody(pickupValidation.updateStatus),
-  updatePickupStatus
+  asyncHandler(updatePickupStatus)
 );
 
 router.put(
@@ -47,7 +48,7 @@ router.put(
   validateObjectId(),
   validateBody(pickupValidation.addSTT),
   checkPermission("manage_pickups", "manage_stt"),
-  addSTTToPickup
+  asyncHandler(addSTTToPickup)
 );
 
 router.put(
@@ -55,32 +56,32 @@ router.put(
   validateObjectId(),
   validateBody(pickupValidation.removeSTT),
   checkPermission("manage_pickups", "manage_stt"),
-  removeSTTFromPickup
+  asyncHandler(removeSTTFromPickup)
 );
 
 // Main CRUD routes
 router
   .route("/")
-  .get(getPickups)
+  .get(asyncHandler(getPickups))
   .post(
     validateBody(pickupValidation.create),
     checkPermission("create_pickups", "manage_pickups"),
-    createPickup
+    asyncHandler(createPickup)
   );
 
 router
   .route("/:id")
-  .get(validateObjectId(), getPickup)
+  .get(validateObjectId(), asyncHandler(getPickup))
   .put(
     validateObjectId(),
     validateBody(pickupValidation.update),
     checkPermission("update_pickups", "manage_pickups"),
-    updatePickup
+    asyncHandler(updatePickup)
   )
   .delete(
     validateObjectId(),
     checkPermission("delete_pickups", "manage_pickups"),
-    deletePickup
+    asyncHandler(deletePickup)
   );
 
 module.exports = router;
