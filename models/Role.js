@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 // Define available permissions
 const AVAILABLE_PERMISSIONS = [
-  // Dashboard 
+  // Dashboard
   'view_dashboard',
   
   // User management
@@ -96,7 +96,22 @@ const AVAILABLE_PERMISSIONS = [
   // Truck Queues
   'manage_truck_queues',
   'manage_branch_truck_queues',
-  'view_truck_queues'
+  'view_truck_queues',
+  
+  // Menu management
+  'manage_menus',
+  'view_menus',
+  'create_menu',
+  'edit_menu',
+  'delete_menu',
+  
+  // Permission management
+  'manage_permissions',
+  'view_permissions',
+  
+  // Menu Access management
+  'manage_menu_access',
+  'view_menu_access'
 ];
 
 const RoleSchema = new mongoose.Schema({

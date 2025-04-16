@@ -13,6 +13,8 @@ const seedCustomers = require("./customerSeeder");
 const seedPickupRequests = require("./pickupRequestSeeder");
 const seedPickups = require("./pickupSeeder");
 const seedVehicleQueues = require("./vehicleQueueSeeder");
+const seedMenus = require("./menuSeeder");
+const seedPermissions = require("./permissionSeeder");
 
 // Configure environment
 dotenv.config();
@@ -43,7 +45,10 @@ const runSeeders = async () => {
           mongoose.connection.collection('customers').deleteMany({}),
           mongoose.connection.collection('pickuprequests').deleteMany({}),
           mongoose.connection.collection('pickups').deleteMany({}),
-          mongoose.connection.collection('vehiclequeues').deleteMany({})
+          mongoose.connection.collection('vehiclequeues').deleteMany({}),
+          mongoose.connection.collection('menus').deleteMany({}),
+          mongoose.connection.collection('menuaccesses').deleteMany({}),
+          mongoose.connection.collection('permissions').deleteMany({})
         ]);
         console.log("Collections cleared successfully".green);
       }
@@ -55,6 +60,9 @@ const runSeeders = async () => {
     
     console.log("Seeding role data...".yellow);
     await seedRoles();
+    
+    console.log("Seeding permission data...".yellow);
+    await seedPermissions();
     
     console.log("Seeding branch data...".yellow);
     await seedBranches();
@@ -76,6 +84,9 @@ const runSeeders = async () => {
     
     console.log("Seeding vehicle queue data...".yellow);
     await seedVehicleQueues();
+    
+    console.log("Seeding menu and access data...".yellow);
+    await seedMenus();
 
     console.log("All data seeded successfully".green.bold);
 

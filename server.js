@@ -30,6 +30,9 @@ const mobileRoutes = require('./routes/mobileRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const vehicleQueueRoutes = require('./routes/vehicleQueueRoutes');
+const menuRoutes = require('./routes/menuRoutes');
+const menuAccessRoutes = require('./routes/menuAccessRoutes');
+const permissionRoutes = require('./routes/permissionRoutes');
 
 // Import middlewares and utilities
 const errorHandler = require('./middlewares/errorHandler');
@@ -83,6 +86,9 @@ app.use('/api/mobile', mobileRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/vehicle-queues', vehicleQueueRoutes);
+app.use('/api/menus', menuRoutes);
+app.use('/api/menu-access', menuAccessRoutes);
+app.use('/api/permissions', permissionRoutes);
 
 // Base route for API
 app.get('/api', (req, res) => {
