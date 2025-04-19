@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const config = require('../config/config');
 
 const UserSchema = new mongoose.Schema({
@@ -16,12 +17,13 @@ const UserSchema = new mongoose.Schema({
     required: [true, 'Jabatan harus diisi'],
     maxlength: [50, 'Jabatan maksimal 50 karakter']
   },
+  // Keep for backward compatibility but mark as deprecated
   roleId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Role',
     required: [true, 'Role harus diisi']
   },
-  // Kode role disimpan langsung untuk memudahkan pengecekan akses
+  // Keep for backward compatibility but mark as deprecated
   role: {
     type: String,
     required: [true, 'Kode role harus diisi']
@@ -147,11 +149,23 @@ UserSchema.pre('findOneAndUpdate', function() {
 });
 
 // Method to generate JWT token
-UserSchema.methods.getSignedJwtToken = function() {
+UserSchema.methods.getSignedJwtToken = async function() {
+  // Get all user roles for inclusion in the token
+  const userRoles = await this.getRoles();
+  const roleIds = userRoles.map(ur => ur.roleId._id.toString());
+  const roleCodes = userRoles.map(ur => ur.roleId.kodeRole);
+  
+  // Get primary role
+  const primaryRole = await this.getPrimaryRole();
+  const primaryRoleId = primaryRole ? primaryRole._id.toString() : null;
+  
   return jwt.sign(
     {
       id: this._id,
-      role: this.role,
+      role: this.role, // Keep for backward compatibility
+      roles: roleCodes, // Add all role codes
+      roleIds: roleIds, // Add all role IDs
+      primaryRoleId: primaryRoleId, // Add primary role ID
       username: this.username,
       cabangId: this.cabangId
     },
@@ -187,15 +201,148 @@ UserSchema.methods.getResetPasswordToken = function() {
   return resetToken;
 };
 
+// Method to get all user roles
+UserSchema.methods.getRoles = async function() {
+  const UserRole = mongoose.model('UserRole');
+  return await UserRole.find({ userId: this._id }).populate('roleId');
+};
+
+// Method to get primary role
+UserSchema.methods.getPrimaryRole = async function() {
+  const UserRole = mongoose.model('UserRole');
+  const primaryUserRole = await UserRole.findOne({
+    userId: this._id,
+    isPrimary: true
+  }).populate('roleId');
+  
+  if (primaryUserRole) {
+    return primaryUserRole.roleId;
+  }
+  
+  // Fallback to legacy roleId if no primary role found
+  return this.roleId;
+};
+
+// Method to get all permissions from all roles
+UserSchema.methods.getAllPermissions = async function() {
+  const UserRole = mongoose.model('UserRole');
+  const RolePermission = mongoose.model('RolePermission');
+  const Role = mongoose.model('Role');
+  
+  // Get all user roles
+  const userRoles = await UserRole.find({ userId: this._id })
+    .populate({
+      path: 'roleId',
+      match: { isActive: true }
+    });
+  
+  // Filter out inactive roles and extract role IDs
+  const roleIds = userRoles
+    .filter(ur => ur.roleId)
+    .map(ur => ur.roleId._id);
+  
+  // Add legacy roleId if it exists
+  if (this.roleId) {
+    // Check if the legacy role is active
+    const legacyRole = await Role.findById(this.roleId);
+    if (legacyRole && legacyRole.isActive) {
+      roleIds.push(this.roleId);
+    }
+  }
+  
+  // Get all permissions for these roles
+  const rolePermissions = await RolePermission.find({
+    roleId: { $in: roleIds }
+  }).populate({
+    path: 'permissionId',
+    match: { isActive: true }
+  });
+  
+  // Extract unique permission codes
+  const permissions = new Set();
+  rolePermissions.forEach(rp => {
+    if (rp.permissionId && rp.permissionId.code) {
+      permissions.add(rp.permissionId.code);
+    }
+  });
+  
+  // Also include legacy permissions from Role model
+  if (this.roleId && this.populated('roleData') && this.roleData.permissions) {
+    this.roleData.permissions.forEach(p => permissions.add(p));
+  } else if (this.roleId) {
+    // If roleData is not populated, fetch it
+    const role = await Role.findById(this.roleId);
+    if (role && role.permissions) {
+      role.permissions.forEach(p => permissions.add(p));
+    }
+  }
+  
+  return Array.from(permissions);
+};
+
 // Method to check if user has permission
 UserSchema.methods.hasPermission = async function(permission) {
-  // Populate the role if not already populated
+  // First try the new permission system
+  const permissions = await this.getAllPermissions();
+  
+  // Direct permission check
+  if (permissions.includes(permission)) {
+    return true;
+  }
+  
+  // Check for wildcard permissions (e.g., manage_all_*)
+  const wildcardPermissions = permissions.filter(p => p.includes('_all_'));
+  
+  // Extract resource type from permission (e.g., 'view_employees' -> 'employees')
+  const parts = permission.split('_');
+  if (parts.length >= 2) {
+    const action = parts[0]; // e.g., 'view'
+    const resource = parts.slice(1).join('_'); // e.g., 'employees'
+    
+    // Check for wildcard permissions like 'manage_all_resources'
+    const hasWildcardPermission = wildcardPermissions.some(wp => {
+      const wpParts = wp.split('_');
+      if (wpParts.length < 3) return false;
+      
+      const wpAction = wpParts[0]; // e.g., 'manage'
+      const wpResource = wpParts.slice(2).join('_'); // e.g., 'resources'
+      
+      // 'manage' action includes all other actions
+      const actionMatches = wpAction === 'manage' || wpAction === action;
+      
+      // Check if resource matches (singular/plural handling)
+      let resourceMatches = false;
+      if (resource.endsWith('s') && wpResource === resource) {
+        resourceMatches = true;
+      } else if (wpResource.endsWith('s') && wpResource === `${resource}s`) {
+        resourceMatches = true;
+      }
+      
+      return actionMatches && resourceMatches;
+    });
+    
+    if (hasWildcardPermission) {
+      return true;
+    }
+    
+    // Check for branch-specific permissions
+    if (permission.includes('_branch_') ||
+        (resource.includes('branch') && !permission.includes('_all_'))) {
+      const branchPermission = `${action}_branch_${resource}`;
+      const managePermission = `manage_branch_${resource}`;
+      
+      if (permissions.includes(branchPermission) || permissions.includes(managePermission)) {
+        return true;
+      }
+    }
+  }
+  
+  // Fallback to legacy permission check
   if (!this.populated('roleData')) {
     await this.populate('roleData');
   }
   
-  // Check if user has the specified permission
-  return this.roleData && this.roleData.permissions.includes(permission);
+  return this.roleData && this.roleData.permissions && this.roleData.permissions.includes(permission);
 };
 
 // Method to check if user is active

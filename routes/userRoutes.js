@@ -7,7 +7,13 @@ const {
   deleteUser,
   getUsersByBranch,
   uploadProfilePicture,
-  uploadDocument
+  uploadDocument,
+  toggleUserStatus,
+  getUserRoles,
+  updateUserRoles,
+  getUserPermissions,
+  previewPermissions,
+  uploadProfileImage
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middlewares/auth');
 const { validateObjectId, validateBody } = require('../middlewares/validator');
@@ -92,6 +98,50 @@ router
   .put(
     validateObjectId('id'),
     uploadDocument
+  );
+
+// RBAC-related routes for user management
+router
+  .route('/:id/status')
+  .patch(
+    authorize('direktur', 'manajer_admin', 'manajer_sdm'),
+    validateObjectId('id'),
+    toggleUserStatus
+  );
+
+router
+  .route('/:id/roles')
+  .get(
+    authorize('direktur', 'manajer_admin', 'manajer_sdm'),
+    validateObjectId('id'),
+    getUserRoles
+  )
+  .post(
+    authorize('direktur', 'manajer_admin'),
+    validateObjectId('id'),
+    updateUserRoles
+  );
+
+router
+  .route('/:id/permissions')
+  .get(
+    authorize('direktur', 'manajer_admin', 'manajer_sdm'),
+    validateObjectId('id'),
+    getUserPermissions
+  );
+
+router
+  .route('/permissions/preview')
+  .post(
+    authorize('direktur', 'manajer_admin', 'manajer_sdm'),
+    previewPermissions
+  );
+
+router
+  .route('/:id/profile-image')
+  .post(
+    validateObjectId('id'),
+    uploadProfileImage
   );
 
 module.exports = router;

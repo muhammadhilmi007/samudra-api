@@ -138,6 +138,7 @@ const RoleSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Keep for backward compatibility
   permissions: {
     type: [String],
     required: true,
@@ -148,6 +149,15 @@ const RoleSchema = new mongoose.Schema({
       },
       message: 'Permission yang diberikan tidak valid'
     }
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  isSystem: {
+    type: Boolean,
+    default: false,
+    description: 'Indicates if this is a system role that cannot be deleted'
   },
   createdAt: {
     type: Date,
@@ -162,9 +172,57 @@ const RoleSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Method to check if role has permission
-RoleSchema.methods.hasPermission = function(permission) {
-  return this.permissions.includes(permission);
+// Virtual for role permissions (new system)
+RoleSchema.virtual('rolePermissions', {
+  ref: 'RolePermission',
+  localField: '_id',
+  foreignField: 'roleId'
+});
+
+// Method to check if role has permission (supports both systems)
+RoleSchema.methods.hasPermission = async function(permission) {
+  // First check legacy permissions array
+  if (this.permissions.includes(permission)) {
+    return true;
+  }
+  
+  // Then check new permission system
+  if (!this.populated('rolePermissions')) {
+    await this.populate({
+      path: 'rolePermissions',
+      populate: {
+        path: 'permissionId'
+      }
+    });
+  }
+  
+  return this.rolePermissions.some(rp =>
+    rp.permissionId && rp.permissionId.code === permission
+  );
+};
+
+// Method to get all permissions (from both systems)
+RoleSchema.methods.getAllPermissions = async function() {
+  // Start with legacy permissions
+  const permissions = new Set(this.permissions);
+  
+  // Add permissions from new system
+  if (!this.populated('rolePermissions')) {
+    await this.populate({
+      path: 'rolePermissions',
+      populate: {
+        path: 'permissionId'
+      }
+    });
+  }
+  
+  this.rolePermissions.forEach(rp => {
+    if (rp.permissionId && rp.permissionId.code) {
+      permissions.add(rp.permissionId.code);
+    }
+  });
+  
+  return Array.from(permissions);
 };
 
 // Update updatedAt on update

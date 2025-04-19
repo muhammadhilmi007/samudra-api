@@ -24,15 +24,13 @@ exports.checkMenuAccess = (menuCode, accessType = 'view') => {
         });
       }
 
+      // Get all user permissions
+      const userPermissions = await req.user.getAllPermissions();
+
       // Check if user has required permissions for the menu
       if (menu.requiredPermissions && menu.requiredPermissions.length > 0) {
-        // Make sure user role is populated
-        if (!req.user.roleId || !req.user.roleId.permissions) {
-          await req.user.populate('roleId', 'permissions');
-        }
-
-        const hasRequiredPermission = menu.requiredPermissions.some(permission => 
-          req.user.roleId.permissions.includes(permission)
+        const hasRequiredPermission = menu.requiredPermissions.some(permission =>
+          userPermissions.includes(permission)
         );
 
         if (!hasRequiredPermission) {
@@ -43,37 +41,50 @@ exports.checkMenuAccess = (menuCode, accessType = 'view') => {
         }
       }
 
-      // Check specific access type in MenuAccess
-      const menuAccess = await MenuAccess.findOne({
-        roleId: req.user.roleId._id,
+      // Get all user roles
+      const userRoles = await req.user.getRoles();
+      const roleIds = userRoles.map(ur => ur.roleId._id);
+      
+      // Also include legacy roleId
+      if (req.user.roleId) {
+        roleIds.push(req.user.roleId);
+      }
+
+      // Check if any role has access to this menu
+      const menuAccesses = await MenuAccess.find({
+        roleId: { $in: roleIds },
         menuId: menu._id
       });
 
-      // If no specific access record, deny access
-      if (!menuAccess) {
+      // If no specific access record for any role, deny access
+      if (menuAccesses.length === 0) {
         return res.status(403).json({
           success: false,
           message: 'Anda tidak memiliki akses ke menu ini'
         });
       }
 
-      // Check specific access type
+      // Check if any role has the specific access type
       let hasAccess = false;
-      switch (accessType.toLowerCase()) {
-        case 'view':
-          hasAccess = menuAccess.canView;
-          break;
-        case 'create':
-          hasAccess = menuAccess.canCreate;
-          break;
-        case 'edit':
-          hasAccess = menuAccess.canEdit;
-          break;
-        case 'delete':
-          hasAccess = menuAccess.canDelete;
-          break;
-        default:
-          hasAccess = menuAccess.canView;
+      for (const menuAccess of menuAccesses) {
+        switch (accessType.toLowerCase()) {
+          case 'view':
+            if (menuAccess.canView) hasAccess = true;
+            break;
+          case 'create':
+            if (menuAccess.canCreate) hasAccess = true;
+            break;
+          case 'edit':
+            if (menuAccess.canEdit) hasAccess = true;
+            break;
+          case 'delete':
+            if (menuAccess.canDelete) hasAccess = true;
+            break;
+          default:
+            if (menuAccess.canView) hasAccess = true;
+        }
+        
+        if (hasAccess) break;
       }
 
       if (!hasAccess) {
@@ -124,26 +135,48 @@ exports.getUserMenus = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    // Make sure user role is populated
-    if (!req.user.roleId || !req.user.roleId.permissions) {
-      await req.user.populate('roleId', 'permissions');
-    }
+    // Get all user permissions
+    const userPermissions = await req.user.getAllPermissions();
 
     // Get all active top-level menus
-    const topLevelMenus = await Menu.find({ 
+    const topLevelMenus = await Menu.find({
       parentId: null,
       isActive: true
     }).sort({ order: 1 });
 
-    // Get menu access for this role
+    // Get all user roles
+    const userRoles = await req.user.getRoles();
+    const roleIds = userRoles.map(ur => ur.roleId._id);
+    
+    // Also include legacy roleId
+    if (req.user.roleId) {
+      roleIds.push(req.user.roleId);
+    }
+
+    // Get menu access for all user roles
     const menuAccesses = await MenuAccess.find({
-      roleId: req.user.roleId._id
+      roleId: { $in: roleIds }
     });
 
     // Create a map of menu IDs to access rights
+    // If a menu has access from multiple roles, combine the access rights
     const menuAccessMap = {};
     menuAccesses.forEach(access => {
-      menuAccessMap[access.menuId.toString()] = access;
+      const menuId = access.menuId.toString();
+      if (!menuAccessMap[menuId]) {
+        menuAccessMap[menuId] = {
+          canView: access.canView,
+          canCreate: access.canCreate,
+          canEdit: access.canEdit,
+          canDelete: access.canDelete
+        };
+      } else {
+        // Combine access rights (OR operation)
+        menuAccessMap[menuId].canView = menuAccessMap[menuId].canView || access.canView;
+        menuAccessMap[menuId].canCreate = menuAccessMap[menuId].canCreate || access.canCreate;
+        menuAccessMap[menuId].canEdit = menuAccessMap[menuId].canEdit || access.canEdit;
+        menuAccessMap[menuId].canDelete = menuAccessMap[menuId].canDelete || access.canDelete;
+      }
     });
 
     // Filter and process menus recursively
@@ -151,8 +184,8 @@ exports.getUserMenus = asyncHandler(async (req, res, next) => {
     
     for (const menu of topLevelMenus) {
       const processedMenu = await processMenuWithChildren(
-        menu, 
-        req.user.roleId.permissions,
+        menu,
+        userPermissions,
         menuAccessMap
       );
       

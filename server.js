@@ -33,6 +33,9 @@ const vehicleQueueRoutes = require('./routes/vehicleQueueRoutes');
 const menuRoutes = require('./routes/menuRoutes');
 const menuAccessRoutes = require('./routes/menuAccessRoutes');
 const permissionRoutes = require('./routes/permissionRoutes');
+const rolePermissionRoutes = require('./routes/rolePermissionRoutes');
+const userRoleRoutes = require('./routes/userRoleRoutes');
+const rbacRoutes = require('./routes/rbacRoutes');
 
 // Import middlewares and utilities
 const errorHandler = require('./middlewares/errorHandler');
@@ -89,6 +92,9 @@ app.use('/api/vehicle-queues', vehicleQueueRoutes);
 app.use('/api/menus', menuRoutes);
 app.use('/api/menu-access', menuAccessRoutes);
 app.use('/api/permissions', permissionRoutes);
+app.use('/api/role-permissions', rolePermissionRoutes);
+app.use('/api/user-roles', userRoleRoutes);
+app.use('/api/rbac', rbacRoutes);
 
 // Base route for API
 app.get('/api', (req, res) => {
